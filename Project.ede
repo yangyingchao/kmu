@@ -1,0 +1,8 @@
+;; Object kmu
+;; EDE project file.
+(ede-proj-project "kmu"
+  :name "kmu"
+  :file "Project.ede"
+  :targets 'nil
+  :makefile-type 'Makefile.am
+  )
