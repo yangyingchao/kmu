@@ -40,8 +40,8 @@ static struct option long_options[] = {
     {"add",     no_argument, 0, 'a'},
     {"delete",  no_argument, 0, 'd'},
     /* Objects */
-    {"USE",  	no_argument, 0, 'U'},
-    {"umask",  	no_argument, 0, 'u'},
+    {"use",  	no_argument, 0, 'u'},
+    {"Umask",  	no_argument, 0, 'U'},
     {"mask",  	no_argument, 0, 'm'},
     {"keyword", no_argument, 0, 'k'},
     /* Helper */
@@ -102,8 +102,8 @@ void usage(char **argv)
     printf ("****** Objects: ********\n");
     printf ("-k, --keyword: Accept a new keyword specified by package_string\n");
     printf ("-m, --mask: 	mask a new keyword specified by package_string\n");
-    printf ("-U, --USE: 	Modify or add new use to package_string\n");
-    printf ("-u, --umask: 	Unmask a package\n");
+    printf ("-u, --use: 	Modify or add new use to package_string\n");
+    printf ("-U, --Umask: 	Unmask a package\n");
     printf ("****** Operations: ********\n");
     printf ("-a, --add: 	Add a object.\n");
     printf ("-d, --delete: 	Delete a object.\n");
@@ -732,7 +732,7 @@ int main(int argc, char **argv)
             type = CLEANUP;
             break;
         }
-        case 'U': {
+        case 'u': {
             if (obj != UNKNOWN) {
                 printf ("Confilict objects!\n");
                 return -1;
@@ -741,7 +741,7 @@ int main(int argc, char **argv)
             break;
         }
 
-        case 'u': {
+        case 'U': {
             if (obj != UNKNOWN) {
                 printf ("Confilict objects!\n");
                 return -1;
