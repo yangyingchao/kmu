@@ -33,14 +33,18 @@
 
 /* Options will be parsed */
 static struct option long_options[] = {
+    /* Actions */
+    {"cleanup", no_argument, 0, 'c'},
     {"list",    no_argument, 0, 'l'},
     {"help",    no_argument, 0, 'h'},
     {"add",     no_argument, 0, 'a'},
-    {"cleanup", no_argument, 0, 'c'},
     {"delete",  no_argument, 0, 'd'},
-    {"use",  	no_argument, 0, 'u'},
+    /* Objects */
+    {"USE",  	no_argument, 0, 'U'},
+    {"umask",  	no_argument, 0, 'u'},
     {"mask",  	no_argument, 0, 'm'},
     {"keyword", no_argument, 0, 'k'},
+    /* Helper */
     {"verbose", no_argument, 0, 'v'},
     {0, 0, 0, 0}
 };
@@ -56,6 +60,7 @@ static type2path path_base[] = {
     { KEYWORD, 	"/etc/portage/package.keywords/keywords"},
     { MASK, 	"/etc/portage/package.mask/mask"},
     { USE, 		"/etc/portage/package.use/use" },
+    { UMASK,    "/etc/portage/package.unmask/unmask"},
     { 0, 		NULL},
 };
 
@@ -93,11 +98,12 @@ char * get_path(object obj)
  */
 void usage(char **argv)
 {
-    printf ("Usage: %s -a|d|l|h -k|m|u [package_string]\n", argv[0]);
+    printf ("Usage: %s -a|d|l|h -k|m|u|U [package_string]\n", argv[0]);
     printf ("****** Objects: ********\n");
     printf ("-k, --keyword: Accept a new keyword specified by package_string\n");
     printf ("-m, --mask: 	mask a new keyword specified by package_string\n");
-    printf ("-k, --use: 	Modify or add new use to package_string\n");
+    printf ("-U, --USE: 	Modify or add new use to package_string\n");
+    printf ("-u, --umask: 	Unmask a package\n");
     printf ("****** Operations: ********\n");
     printf ("-a, --add: 	Add a object.\n");
     printf ("-d, --delete: 	Delete a object.\n");
@@ -221,10 +227,11 @@ str_list *key_exist(const char *key)
     }
     return NULL;
 }
+
 /**
- * merge_use - Merge old USE with the new one.
- * @old - Character old
- * @ - Character
+ * merge_use() - Merge new use into old ptr.
+ * @p: ptr where old USE was stored
+ * @new: New USE to be merged.
  *
  * Return: int
  */
@@ -371,35 +378,47 @@ int add_obj(object obj, const char *input_str)
         return -1;
     }
 
-    char **margv = strsplit(input_str);
-    char *key = margv[0];
 
-    p = key_exist(margv[0]);
-    if (p != NULL && obj == USE) { /* Merge USE */
-        char c;
-        printf("Item %s is already in the destination!\n"
-               "Orignal content: %s\n", margv[0],  p->str);
-        printf ("Would you like to merge it ?\n");
-        c = fgetc(stdin);
-        if ((c == 'Y') || (c == 'y')) {
-            if (merge_use(p, input_str) != 0) {
-                fprintf(stderr, "ERROR: Failed to merge use "
-                        "please update it manually!\n");
-                return -1;
+    switch (obj) {
+    case USE: { /* USEs may need to be merged. */
+        char **margv = strsplit(input_str);
+        p = key_exist(margv[0]);
+        free_array(margv);
+        if (p != NULL) { /* Merge USE */
+            char c;
+            printf("Item %s is already in the destination!\n"
+                   "Orignal content: %s\n", margv[0],  p->str);
+            printf ("Would you like to merge it ?\n");
+            c = fgetc(stdin);
+            if ((c == 'Y') || (c == 'y')) {
+                if (merge_use(p, input_str) != 0) {
+                    fprintf(stderr, "ERROR: Failed to merge use "
+                            "please update it manually!\n");
+                    return -1;
+                }
+                goto dump_add;
+            }
+            else {
+                printf ("New item was not added to database.\n");
+                return 0;
             }
         }
-        else {
-            printf ("New item was not added to database.\n");
-            return 0;
-        }
     }
-    else {
+
+    /* Fall through */
+    case KEYWORD:
+    case MASK:
+    case UMASK: { /* These objects does not need merge, just add new ones. */
         p = (str_list *) malloc(sizeof(str_list));
         memset(p, 0, sizeof(str_list));
         p->str = strdup(input_str);
         list_add(&p->head, &content_list);
+        break;
     }
-    free_array(margv);
+    default:
+        break;
+    }
+dump_add:
     printf ("Added item: %s\n", p->str);
     return  dump2file(path);
 }
@@ -674,7 +693,7 @@ int main(int argc, char **argv)
         /* getopt_long stores the option index here. */
         int option_index = 0;
 
-        c = getopt_long (argc, argv, "adumklhcv",
+        c = getopt_long (argc, argv, "adumklhcvU",
                          long_options, &option_index);
 
         /* Detect the end of the options. */
@@ -713,12 +732,21 @@ int main(int argc, char **argv)
             type = CLEANUP;
             break;
         }
-        case 'u': {
+        case 'U': {
             if (obj != UNKNOWN) {
                 printf ("Confilict objects!\n");
                 return -1;
             }
             obj = USE;
+            break;
+        }
+
+        case 'u': {
+            if (obj != UNKNOWN) {
+                printf ("Confilict objects!\n");
+                return -1;
+            }
+            obj = UMASK;
             break;
         }
 
@@ -762,6 +790,7 @@ int main(int argc, char **argv)
             break;
 
         default:
+            printf("??\n");
             abort ();
         }
     }

@@ -39,6 +39,7 @@ typedef enum _object{
     KEYWORD,
     MASK,
     USE,
+    UMASK,
 } object;
 
 typedef struct _type2path {
