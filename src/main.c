@@ -64,6 +64,13 @@ static type2path path_base[] = {
     { 0, 		NULL},
 };
 
+static char * obj_desc[] = {
+    "Ubknown object",
+    "Keyword",
+    "Mask",
+    "USE",
+    "Unmask"
+};
 
 static verbose = 0;
 
@@ -367,6 +374,7 @@ int add_obj(object obj, const char *input_str)
     str_list *p = NULL;
     int  i = 0;
 
+    printf("Adding new Item to %s.\n", obj_desc[obj]);
     path = get_path(obj);
     if (path == NULL){
         oops("Failed to get path according to object!\n");
@@ -437,6 +445,7 @@ int list_obj(object obj, const char *key)
     str_list *p = NULL;
     struct list_head *ptr = NULL;
 
+    printf("List entry in %s.\n", obj_desc[obj]);
     path = get_path(obj);
     if (path == NULL){
         fprintf(stderr, "ERROR: Failed to get path according to object!\n");
@@ -493,6 +502,7 @@ int del_obj(object obj, const char *keyword)
     char * path = get_path(obj);
     char c;
 
+    printf("Deleting entry for: %s.\n", obj_desc[obj]);
     if (path == NULL){
         printf ("Failed to get path according to object!\n");
         return -1;
@@ -684,6 +694,7 @@ int main(int argc, char **argv)
     object obj = UNKNOWN;
     int ret=0;
     char items[1024];
+    int err_flag = 0;
 
     INIT_LIST_HEAD(&content_list);
 
@@ -719,7 +730,7 @@ int main(int argc, char **argv)
         case 'a': {
             if (type != UNKNOWN) {
                 printf ("Confilict actions!\n");
-                return -1;
+                err_flag = 1;
             }
             type = ADD;
             break;
@@ -727,7 +738,7 @@ int main(int argc, char **argv)
         case 'c': {
             if (type != UNKNOWN) {
                 printf ("Confilict actions!\n");
-                return -1;
+                err_flag = 1;
             }
             type = CLEANUP;
             break;
@@ -735,7 +746,7 @@ int main(int argc, char **argv)
         case 'u': {
             if (obj != UNKNOWN) {
                 printf ("Confilict objects!\n");
-                return -1;
+                err_flag = 1;
             }
             obj = USE;
             break;
@@ -744,7 +755,7 @@ int main(int argc, char **argv)
         case 'U': {
             if (obj != UNKNOWN) {
                 printf ("Confilict objects!\n");
-                return -1;
+                err_flag = 1;
             }
             obj = UMASK;
             break;
@@ -753,7 +764,7 @@ int main(int argc, char **argv)
         case 'm': {
             if (obj != UNKNOWN) {
                 printf ("Confilict objects!\n");
-                return -1;
+                err_flag = 1;
             }
             obj = MASK;
             break;
@@ -761,7 +772,7 @@ int main(int argc, char **argv)
         case 'k': {
             if (obj != UNKNOWN) {
                 printf ("Confilict objects!\n");
-                return -1;
+                err_flag = 1;
             }
             obj = KEYWORD;
             break;
@@ -769,7 +780,7 @@ int main(int argc, char **argv)
         case 'd': {
             if (type != UNKNOWN) {
                 printf ("Confilict actions!\n");
-                return -1;
+                err_flag = 1;
             }
             type = DELETE;
             break;
@@ -777,7 +788,7 @@ int main(int argc, char **argv)
         case 'l': {
             if (type != UNKNOWN) {
                 printf ("Confilict actions!\n");
-                return -1;
+                err_flag = 1;
             }
             type = LIST;
             break;
@@ -792,6 +803,10 @@ int main(int argc, char **argv)
         default:
             printf("??\n");
             abort ();
+        }
+        if (err_flag) {
+            usage(argv);
+            return -1;
         }
     }
 
