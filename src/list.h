@@ -13,6 +13,7 @@
 
 struct list_head {
 	struct list_head *next, *prev;
+    int counter;
 };
 
 #define LIST_HEAD_INIT(name) { &(name), &(name) }
@@ -22,6 +23,7 @@ struct list_head {
 
 #define INIT_LIST_HEAD(ptr) do { \
 	(ptr)->next = (ptr); (ptr)->prev = (ptr); \
+    (ptr)->counter = 0;\
 } while (0)
 
 /*

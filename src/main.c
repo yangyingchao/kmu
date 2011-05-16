@@ -1,5 +1,5 @@
 /***************************************************************************
- *  Copyright (C) 2010 yangyingchao@gmail.com
+ *  Copyright (C) 2010-2011 yangyingchao@gmail.com
 
  *  Author: yangyingchao <yangyingchao@gmail.com>
 
@@ -118,7 +118,58 @@ void usage(char **argv)
     printf ("-h, --help: 	Print this message.\n");
 }
 
+static int
+cmpstringgp(const void *p1, const void *p2)
+{
+    char *pp1 = (char *)p1;
+    char *pp2 = (char *)p2;
+    while ( *pp1 == '<' || *pp1 == '=' || *pp1 == '>') {
+        pp1 ++;
+    }
+    while ( *pp2 == '<' || *pp2 == '=' || *pp2 == '>') {
+        pp2 ++;
+    }
+    return (0 - strcmp(* (char * const *) pp1, * (char * const *) pp2));
+}
 
+
+/**
+ * list_to_array() - Change list into a sortted array.
+ *
+ * Return: char**
+ */
+char **list_to_array()
+{
+    PDEBUG ("called.\n");
+
+    struct list_head *ptr = NULL;
+    str_list *p = NULL;
+
+    int size = content_list.counter;
+    if (size <= 0) {
+        return NULL;
+    }
+    char **array = calloc(size, sizeof(char *));
+    if (array != NULL) {
+        int i = 0;
+        char tmp[256];
+        list_for_each(ptr, &content_list){
+            memset(tmp, 0, 256);
+            p = list_entry(ptr, str_list, head);
+            if (p->flag == True || strlen(p->str) == 1)
+                continue;
+            else {
+                strncpy(tmp, p->str, strlen(p->str));
+                strcat(tmp, "\n");
+                PDEBUG ("Item: %s\n", tmp);
+                array[i] = strndup(tmp, strlen(tmp));
+            }
+            i++;
+        }
+        qsort((void *)array, size, sizeof(char *), cmpstringgp);
+    }
+    return array;
+}
 
 /**
  * dump2file - Write content stored in content_list into a file.
@@ -143,17 +194,36 @@ int dump2file(const char *path)
     if (fd == -1)
         oops("Failed to mktemp");
 
-    list_for_each(ptr, &content_list){
-        p = list_entry(ptr, str_list, head);
-        if (p->flag == True || strlen(p->str) == 1)
-            continue;
-        else {
-            writen = write(fd, p->str, strlen(p->str));
-            if (writen == -1)
-                oops("Failed to write:");
-            writen = write(fd, "\n", 1);
+    char **array = list_to_array();
+    if (array == NULL) {
+        fprintf(stderr, "ERROR: failed to convert list into string"
+                "Items will be recorded without order.");
+        list_for_each(ptr, &content_list){
+            p = list_entry(ptr, str_list, head);
+            if (p->flag == True || strlen(p->str) == 1)
+                continue;
+            else {
+                writen = write(fd, p->str, strlen(p->str));
+                if (writen == -1)
+                    oops("Failed to write:");
+                writen = write(fd, "\n", 1);
+            }
         }
     }
+    else {
+        int i;
+        char *str;
+        for (i = 0; i < content_list.counter; i++) {
+            str = array[i];
+            writen = write(fd, str, strlen(str));
+            if (writen < 0) {
+                fprintf(stderr, "ERROR: failed to write: %s, reason: %s\n",
+                        str, strerror(errno));
+                continue;
+            }
+        }
+    }
+
     close(fd);
 
     ret = unlink(path);
@@ -207,6 +277,7 @@ int read_content(const char *path)
         strncpy(tmp, item, strlen(item)-1);
         p->str = tmp;
         list_add(&p->head, &content_list);
+        content_list.counter ++;
     }
     if (item)
         free(item);
@@ -214,6 +285,7 @@ int read_content(const char *path)
     fclose(fd);
     return 0;
 }
+
 /**
  * key_exist - To query whether this key exists in memory or not.
  * @key - Character key
@@ -458,26 +530,27 @@ int list_obj(object obj, const char *key)
         return -1;
     }
 
+    printf("Total entries: %d\n", content_list.counter);
+
     if (strlen(key) == 0) {
         /* All items will be displayed. */
+        printf("Display all items:\n");
         list_for_each(ptr, &content_list){
             p = list_entry(ptr, str_list, head);
-            printf ("%s\n", p->str);
+            printf ("    %s\n", p->str);
         }
     }
     else {
         char **margv = strsplit(key);
         char *item = NULL;
         int i = 0;
-        list_for_each(ptr, &content_list){
+        printf("Found entries including (%s):\n", key);
+        list_for_each(ptr, &content_list) {
             i = 0;
             p = list_entry(ptr, str_list, head);
             while (margv[i]) {
-                PDEBUG ("margv[%d]: %s, len: %d\n", i, margv[i],
-                        strlen(margv[i]));
-
                 if (strstr(strsplit(p->str)[0], margv[i]))
-                    printf ("%s\n", p->str);
+                    printf ("    %s\n", p->str);
                 i++;
             }
         }
@@ -523,6 +596,7 @@ int del_obj(object obj, const char *keyword)
             if (strstr(p->str, margv[i])) {
                 printf ("Item: %s", p->str);
                 p->flag = True;
+                content_list.counter --;
                 counter++;
             }
         }
@@ -628,6 +702,7 @@ int process_file(const char *fpath, const struct stat *sb, int typeflag)
     }
     return 0;
 }
+
 /**
  * real_delete - Delete or display files to be removed.
  * @doit - delete or just display.
