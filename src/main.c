@@ -493,6 +493,7 @@ int add_obj(object obj, const char *input_str)
         memset(p, 0, sizeof(str_list));
         p->str = strdup(input_str);
         list_add(&p->head, &content_list);
+        content_list.counter ++;
         break;
     }
     default:
