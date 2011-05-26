@@ -117,7 +117,13 @@ void usage(char **argv)
     printf ("-l, --list: 	List a object.\n");
     printf ("-h, --help: 	Print this message.\n");
 }
-
+/**
+ * Compare two input strings to sort.
+ *
+ * @param p1,p2 - Strings to be compared.
+ *
+ * @return: int
+ */
 static int
 cmpstringgp(const void *p1, const void *p2)
 {
@@ -134,9 +140,9 @@ cmpstringgp(const void *p1, const void *p2)
 
 
 /**
- * list_to_array() - Change list into a sortted array.
+ * Change list into a sortted array.
  *
- * Return: char**
+ * @return: char**
  */
 char **list_to_array()
 {
@@ -238,6 +244,8 @@ int dump2file(const char *path)
     else {
         unlink(tmpl);
         chmod(path,  S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+        printf("Finished to write file: %s, total items: %d\n",
+               path, content_list.counter);
     }
     return 0;
 }
@@ -308,12 +316,13 @@ str_list *key_exist(const char *key)
 }
 
 /**
- * merge_use() - Merge new use into old ptr.
- * @p: ptr where old USE was stored
- * @new: New USE to be merged.
+ * Merge new use into old ptr.
+ * @param p -  ptr where old USE was stored
  *
- * Return: int
- */
+ * @param  - New USE to be merged.
+ *
+ * @return: int
+*/
 int merge_use(str_list *p, const char *new)
 {
     char **item_old = strsplit(p->str);
@@ -705,10 +714,11 @@ int process_file(const char *fpath, const struct stat *sb, int typeflag)
 }
 
 /**
- * real_delete - Delete or display files to be removed.
- * @doit - delete or just display.
+ * Delete or display files to be removed.
  *
- * Return: int
+ * @param doit - flag, whether to delete or not.
+ *
+ * @return: int
  */
 int real_delete(int doit)
 {
@@ -733,6 +743,11 @@ int real_delete(int doit)
     return ret;
 }
 
+/**
+ * Cleans up local cached files.
+ *
+ * @return: 0 if succeeded, or non-zero otherwise.
+ */
 int cleanup_localdist_resources()
 {
     int ret;
@@ -763,6 +778,15 @@ int cleanup_localdist_resources()
     return ret;
 }
 
+/**
+ * Entry of KMU.
+ *
+ * @param argc - Number of arguments
+ *
+ * @param argv - Argument vector
+ *
+ * @return: 0 if succeeded, or non-zero otherwise.
+ */
 int main(int argc, char **argv)
 {
     int c;
