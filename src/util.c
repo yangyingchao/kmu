@@ -16,6 +16,7 @@ static char name_tmp[256];
 const char *reserved[] = {
     "samba",
     "patch",
+    "linux",
     0
 };
 
