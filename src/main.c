@@ -29,6 +29,7 @@
 #include <errno.h>
 #include <sys/stat.h>
 #include <ftw.h>
+#include <libgen.h>
 #include "util.h"
 
 /* Options will be parsed */
@@ -127,15 +128,20 @@ void usage(char **argv)
 static int
 cmpstringgp(const void *p1, const void *p2)
 {
-    char *pp1 = (char *)p1;
-    char *pp2 = (char *)p2;
+    PDEBUG ("ADDR: %lu - %lu\n", (unsigned long)p1, (unsigned long)p2);
+
+    char *pp1 = *(char * const *)p1;
+    char *pp2 = *(char * const *)p2;
+
+    PDEBUG ("\t1, %s:%s\n", pp1, pp2);
     while ( *pp1 == '<' || *pp1 == '=' || *pp1 == '>') {
         pp1 ++;
     }
     while ( *pp2 == '<' || *pp2 == '=' || *pp2 == '>') {
         pp2 ++;
     }
-    return (0 - strcmp(* (char * const *) pp1, * (char * const *) pp2));
+    PDEBUG ("\t2, %s:%s\n", pp1, pp2);
+    return (0 - strcmp(pp1, pp2));
 }
 
 
@@ -167,12 +173,11 @@ char **list_to_array()
             else {
                 strncpy(tmp, p->str, strlen(p->str));
                 strcat(tmp, "\n");
-                PDEBUG ("Item: %s\n", tmp);
                 array[i] = strndup(tmp, strlen(tmp));
             }
             i++;
         }
-        qsort((void *)array, size, sizeof(char *), cmpstringgp);
+        qsort((void *)&array[0], size, sizeof(char *), cmpstringgp);
     }
     return array;
 }
@@ -674,10 +679,10 @@ int process_file(const char *fpath, const struct stat *sb, int typeflag)
             return 0;
         }
 
-        bname = (char *)basename(strdup(ptr));
+        bname = basename(strdup(ptr));
         list_for_each(pptr, &source_list){
             p = list_entry(pptr, name_version, head);
-            if (strcmp(name_split((char *)basename(strdup(p->name))),
+            if (strcmp(name_split(basename(strdup(p->name))),
                        bname) == 0) {
                 found = 1;
                 deleted ++;
