@@ -106,17 +106,24 @@ char * get_path(object obj)
  */
 void usage(char **argv)
 {
-    printf ("Usage: %s -a|d|l|h -k|m|u|U [package_string]\n", argv[0]);
+    printf ("Usage: kmu -a|d|l|h -k|m|u|U [package_string]\n");
     printf ("****** Objects: ********\n");
     printf ("-k, --keyword: Accept a new keyword specified by package_string\n");
     printf ("-m, --mask: 	mask a new keyword specified by package_string\n");
     printf ("-u, --use: 	Modify or add new use to package_string\n");
-    printf ("-U, --Umask: 	Unmask a package\n");
+    printf ("-U, --Umask: 	Unmask a package\n\n");
     printf ("****** Operations: ********\n");
-    printf ("-a, --add: 	Add a object.\n");
-    printf ("-d, --delete: 	Delete a object.\n");
-    printf ("-l, --list: 	List a object.\n");
-    printf ("-h, --help: 	Print this message.\n");
+    printf ("-a, --add: 	Add an object.\n");
+    printf ("-d, --delete: 	Delete an object.\n");
+    printf ("-l, --list: 	List an object.\n");
+    printf ("-h, --help: 	Print this message.\n\n");
+    printf("****** Examples: ******\n");
+    printf("List all keywords stored in /etc/portage/package.keyword:\n"
+           "\tkmu -lk\n");
+    printf("Add a keyword into /etc/portage/package.keyword:\n"
+           "\t kmu -ak\n");
+    printf("Delete keyword entry which includes xxx\n"
+           "\t  -du xxx\n");
 }
 /**
  * Compare two input strings to sort.
