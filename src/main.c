@@ -123,7 +123,7 @@ void usage(char **argv)
     printf("Add a keyword into /etc/portage/package.keyword:\n"
            "\t kmu -ak\n");
     printf("Delete keyword entry which includes xxx\n"
-           "\t  -du xxx\n");
+           "\t kmu -du xxx\n");
 }
 /**
  * Compare two input strings to sort.
@@ -467,6 +467,11 @@ int add_obj(object obj, const char *input_str)
     str_list *p = NULL;
     int  i = 0;
 
+    if (input_str == NULL || strlen(input_str) == 0) {
+        fprintf(stderr, "ERROR: You should provide a entry to add.\n");
+        return -1;
+    }
+
     printf("Adding new Item to %s.\n", obj_desc[obj]);
     path = get_path(obj);
     if (path == NULL){
@@ -540,6 +545,7 @@ int list_obj(object obj, const char *key)
     struct list_head *ptr = NULL;
 
     printf("List entry in %s.\n", obj_desc[obj]);
+
     path = get_path(obj);
     if (path == NULL){
         fprintf(stderr, "ERROR: Failed to get path according to object!\n");
@@ -582,14 +588,14 @@ int list_obj(object obj, const char *key)
 }
 
 /**
- * Delete a record which contains keyword in this Object.
+ * Delete a record which contains input_str in this Object.
  *
  * @param obj: an object used to identify which file to modify.
- * @param keyword: an keyword to identify which record to be removed.
+ * @param input_str: an input_str to identify which record to be removed.
  *
  * @Note: Multiple objects (separeted by whitespace) can be deleted each time.
  */
-int del_obj(object obj, const char *keyword)
+int del_obj(object obj, const char *input_str)
 {
     str_list *p = NULL;
     struct list_head *ptr = NULL;
@@ -597,12 +603,17 @@ int del_obj(object obj, const char *keyword)
     char * path = get_path(obj);
     char c;
 
+    if (input_str == NULL || strlen(input_str) == 0) {
+        fprintf(stderr, "ERROR: You should provide a entry to delete.\n");
+        return -1;
+    }
+
     printf("Deleting entry for: %s.\n", obj_desc[obj]);
     if (path == NULL){
         printf ("Failed to get path according to object!\n");
         return -1;
     }
-    printf("File: \t%s\nItem: \t%s\n", path, keyword);
+    printf("File: \t%s\nItem: \t%s\n", path, input_str);
 
     if (read_content(path) == -1) {
         fprintf(stderr, "ERROR: Failed to read content of file: %s!\n",
@@ -610,7 +621,7 @@ int del_obj(object obj, const char *keyword)
         return -1;
     }
 
-    char **margv = strsplit(keyword);
+    char **margv = strsplit(input_str);
 
     while (margv[i]) {
         list_for_each(ptr, &content_list){
