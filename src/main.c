@@ -678,6 +678,7 @@ int process_file(const char *fpath, const struct stat *sb, int typeflag)
     struct list_head *pptr = NULL;
     int found = 0, ret = 0;
     char *to_delete = NULL;
+    char *to_keep = NULL;
 
     if (typeflag == FTW_F) {
         /*
@@ -698,6 +699,7 @@ int process_file(const char *fpath, const struct stat *sb, int typeflag)
         }
 
         bname = basename(strdup(ptr));
+        to_keep = strdup(fpath);
         list_for_each(pptr, &source_list){
             p = list_entry(pptr, name_version, head);
             if (strcmp(name_split(basename(strdup(p->name))),
@@ -712,24 +714,25 @@ int process_file(const char *fpath, const struct stat *sb, int typeflag)
                     p->name = strdup(fpath);
                     p->version = sb->st_mtime;
                 }
-                else
+                else {
                     to_delete = strdup(fpath);
+                    to_keep = strdup(p->name);
                     freed_size += sb->st_size;
+                }
                 break;
             }
         }
 
-    do_delte:
+        p = calloc(sizeof(name_version), 1);
         if (found == 0) { /* Add file into source_list. */
-            p          = calloc(sizeof(name_version), 1);
-            p->name    = strdup(fpath);
+            p->name    = strdup(to_keep);
             p->version = sb->st_mtime;
             p->size    = sb->st_size;
             list_add(&p->head, &source_list);
         }
         else {  /* Add file into del_list if found was set. */
-            p          = calloc(sizeof(name_version), 1);
             p->name    = strdup(to_delete);
+            p->to_keep = strdup(to_keep);
             list_add(&p->head, &del_list);
         }
     }
@@ -746,6 +749,7 @@ int process_file(const char *fpath, const struct stat *sb, int typeflag)
 int real_delete(int doit)
 {
     int ret = 0;
+    int i = 0;
     struct list_head *pptr = NULL;
     name_version     *p   = NULL;
     if (doit) { /* Real action to delete file!*/
@@ -760,7 +764,9 @@ int real_delete(int doit)
         printf ("To be deleted: \n");
         list_for_each(pptr, &del_list){
             p = list_entry(pptr, name_version, head);
-            printf ("\t %s\n", p->name);
+            printf ("\t%03d DEL:  %s\n", i, p->name);
+            printf ("\t    KEEP: %s\n", p->to_keep);
+            i++;
         }
     }
     return ret;

@@ -56,6 +56,7 @@ typedef struct _str_list {
 typedef struct _name_version {
     struct list_head  head;
     char             *name;
+    char             *to_keep;
     time_t            version;
     size_t            size;
 } name_version;
