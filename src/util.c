@@ -17,6 +17,7 @@ const char *reserved[] = {
     "samba",
     "patch",
     "linux",
+    "firefox",
     0
 };
 
