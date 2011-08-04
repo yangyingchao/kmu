@@ -8,9 +8,10 @@
     :name "kmu"
     :path ""
     :source '("main.c" "util.h" "util.c")
-    :configuration-variables '(("AM_CFLAGS -DDEBUG"))
+    :configuration-variables 'nil
     )
    )
+  :configuration-default "release"
   :makefile-type 'Makefile.am
   :configuration-variables 'nil
   )

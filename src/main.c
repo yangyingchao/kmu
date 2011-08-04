@@ -125,6 +125,7 @@ void usage(char **argv)
     printf("Delete keyword entry which includes xxx\n"
            "\t kmu -du xxx\n");
 }
+
 /**
  * Compare two input strings to sort.
  *
@@ -132,17 +133,10 @@ void usage(char **argv)
  *
  * @return: int
  */
-static int
-cmpstringgp(const void *p1, const void *p2)
+int cmpstringgp(const void *p1, const void *p2)
 {
-    if (p1 == NULL || p2 == NULL ||
-        *(char * const *)p1 == NULL ||
-        *(char * const *)p2 == NULL) {
-        fprintf(stderr, "ERROR: null pointer!\n");
-        return 0;
-    }
-    char *pp2 = *(char * const *)p2;
     char *pp1 = *(char * const *)p1;
+    char *pp2 = *(char * const *)p2;
 
     while ( *pp1 == '<' || *pp1 == '=' || *pp1 == '>') {
         pp1 ++;
@@ -168,41 +162,47 @@ char **list_to_array()
     if (size <= 0) {
         return NULL;
     }
+
     size = size * sizeof(char *);
 
     PDEBUG ("A, size: %d\n", size);
-    char **array = malloc(size);
+    char **arrays = malloc(size);
+    memset(arrays, 0, size);
     PDEBUG ("B\n");
 
-    if (array != NULL) {
+    if (arrays != NULL) {
         int i = 0;
         int len = 0;
         char tmp[256];
         str_list *ptr = NULL;
 
         ptr = content_list->next;
-        while (ptr != NULL) {
+        while (ptr) {
             len = strlen(ptr->str);
             if (ptr->un.flag == True || len  <= 1) {
                 PDEBUG ("%s will not saved.\n", ptr->str);
+                ptr = ptr->next;
                 continue;
             }
             else {
                 memset(tmp, 0, 256);
                 strncpy(tmp, ptr->str, len);
-                strcat(tmp, "\n");
-                array[i] = strndup(tmp, strlen(tmp));
+                if (*(ptr->str+len-1) != '\n') {
+                    strcat(tmp, "\n");
+                }
+                arrays[i] = strdup(tmp);
             }
             i++;
             ptr = ptr->next;
         }
 
-        PDEBUG ("Send to qsort!\n");
-        qsort((void *)&array[0], size, sizeof(char *), cmpstringgp);
+        PDEBUG ("Send to qsort, size: %d!\n", content_list->un.counter);
+        qsort((void *)&arrays[0], content_list->un.counter,
+              sizeof(char *), cmpstringgp);
     }
     PDEBUG ("return\n");
 
-    return array;
+    return arrays;
 }
 
 /**
@@ -213,7 +213,6 @@ char **list_to_array()
  */
 int dump2file(const char *path)
 {
-    str_list *p = NULL;
     int ret = 0, writen, fd = 0;
     struct list_head *ptr = NULL;
 
@@ -229,9 +228,10 @@ int dump2file(const char *path)
         oops("Failed to mktemp");
 
     char **array = list_to_array();
+    /* char **array = NULL; */
     if (array == NULL) {
         fprintf(stderr, "ERROR: failed to convert list into string"
-                "Items will be recorded without order.");
+                "Items will be recorded without order.\n");
         int len;
         str_list *ptr = content_list->next;
         while (ptr != NULL) {
@@ -381,11 +381,11 @@ int merge_use(str_list *p, const char *new)
 
     PDEBUG ("size = %d\n", size);
 
-    new_array = (char **)calloc(size, sizeof(char *));
+    new_array = (char **)malloc(size * sizeof(char *));
 
     i = 0;
     while (item_old[i]) {
-        new_array[i] = item_old[i];
+        new_array[i] = strdup(item_old[i]);
         i++;
     }
     PDEBUG ("Finished to copy old USEs.\n");
@@ -443,7 +443,6 @@ int merge_use(str_list *p, const char *new)
             }
         }
         PDEBUG ("Existed ?%s\n", existed?"Y":"N");
-        PDEBUG ("J = %d\n", j);
         if (!existed) {
             PDEBUG ("Add: %d-%s\n", j, item);
             new_array[j] = strdup(item);
@@ -473,6 +472,7 @@ int merge_use(str_list *p, const char *new)
 
     free(p->str);
     p->str = strdup(new_item);
+    PDEBUG ("return\n");
     return 0;
 }
 
@@ -525,6 +525,8 @@ int add_obj(object obj, const char *input_str)
                             "please update it manually!\n");
                     return -1;
                 }
+                PDEBUG ("After merged: %s\n", p->str);
+
                 goto dump_add;
             }
             else {
@@ -592,17 +594,22 @@ int list_obj(object obj, const char *key)
         }
     }
     else {
+        PDEBUG ("key: %s\n", key);
+
         char **margv = strsplit(key);
-        char *item = NULL;
+        char **items = NULL;
         int i = 0;
         printf("Found entries including (%s):\n", key);
-        while (ptr) {
-            while (margv[i]) {
-                if (strstr(strsplit(ptr->str)[0], margv[i]))
+        while (margv[i]) {
+            ptr = content_list->next;
+            while (ptr) {
+                items = strsplit(ptr->str);
+                if (strstr(items[0], margv[i]))
                     printf ("    %s\n", ptr->str);
-                i++;
+                free_array(items);
+                ptr = ptr->next;
             }
-            ptr = ptr->next;
+            i++;
         }
         free_array(margv);
     }
@@ -619,7 +626,6 @@ int list_obj(object obj, const char *key)
  */
 int del_obj(object obj, const char *input_str)
 {
-    str_list *ptr = content_list->next;
     int counter = 0, i = 0, ret = 0;
     char * path = get_path(obj);
     char c;
@@ -643,8 +649,10 @@ int del_obj(object obj, const char *input_str)
     }
 
     char **margv = strsplit(input_str);
-
+    str_list *ptr = NULL;
     while (margv[i]) {
+        ptr  = content_list->next;
+        PDEBUG ("Target: %s\n", margv[i]);
         while (ptr) {
             if (strstr(ptr->str, margv[i])) {
                 printf ("Item: %s", ptr->str);
@@ -789,6 +797,7 @@ int real_delete(int doit)
             printf ("\t%03d DEL:  %s\n", i, ptr->name);
             printf ("\t    KEEP: %s\n", ptr->to_keep);
             i++;
+            ptr = ptr->next;
         }
     }
     return ret;
