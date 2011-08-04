@@ -136,3 +136,14 @@ void free_array(char **array)
         free(array[i]);
     }
 }
+
+
+void list_add(str_list *root, void *new)
+{
+    str_list *ptr = root;
+    while (ptr->next != NULL) {
+        ptr = ptr->next;
+    }
+    ptr->next = new;
+}
+

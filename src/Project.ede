@@ -7,8 +7,8 @@
    (ede-proj-target-makefile-program "kmu"
     :name "kmu"
     :path ""
-    :source '("main.c" "util.h" "util.c" "list.h")
-    :configuration-variables 'nil
+    :source '("main.c" "util.h" "util.c")
+    :configuration-variables '(("AM_CFLAGS -DDEBUG"))
     )
    )
   :makefile-type 'Makefile.am

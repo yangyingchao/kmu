@@ -53,9 +53,9 @@ static struct option long_options[] = {
 static int  freed_size = 0;
 static int  deleted    = 0;
 
-static struct list_head source_list;
-static struct list_head del_list;
-static struct list_head content_list;
+name_version *source_list;
+name_version *del_list;
+str_list *content_list = NULL;
 
 static type2path path_base[] = {
     { KEYWORD, 	"/etc/portage/package.keywords/keywords"},
@@ -135,19 +135,22 @@ void usage(char **argv)
 static int
 cmpstringgp(const void *p1, const void *p2)
 {
-    PDEBUG ("ADDR: %lu - %lu\n", (unsigned long)p1, (unsigned long)p2);
-
-    char *pp1 = *(char * const *)p1;
+    if (p1 == NULL || p2 == NULL ||
+        *(char * const *)p1 == NULL ||
+        *(char * const *)p2 == NULL) {
+        fprintf(stderr, "ERROR: null pointer!\n");
+        return 0;
+    }
     char *pp2 = *(char * const *)p2;
+    char *pp1 = *(char * const *)p1;
 
-    PDEBUG ("\t1, %s:%s\n", pp1, pp2);
     while ( *pp1 == '<' || *pp1 == '=' || *pp1 == '>') {
         pp1 ++;
     }
     while ( *pp2 == '<' || *pp2 == '=' || *pp2 == '>') {
         pp2 ++;
     }
-    PDEBUG ("\t2, %s:%s\n", pp1, pp2);
+
     return (0 - strcmp(pp1, pp2));
 }
 
@@ -161,31 +164,44 @@ char **list_to_array()
 {
     PDEBUG ("called.\n");
 
-    struct list_head *ptr = NULL;
-    str_list *p = NULL;
-
-    int size = content_list.counter;
+    int size = content_list->un.counter;
     if (size <= 0) {
         return NULL;
     }
-    char **array = calloc(size, sizeof(char *));
+    size = size * sizeof(char *);
+
+    PDEBUG ("A, size: %d\n", size);
+    char **array = malloc(size);
+    PDEBUG ("B\n");
+
     if (array != NULL) {
         int i = 0;
+        int len = 0;
         char tmp[256];
-        list_for_each(ptr, &content_list){
-            memset(tmp, 0, 256);
-            p = list_entry(ptr, str_list, head);
-            if (p->flag == True || strlen(p->str) == 1)
+        str_list *ptr = NULL;
+
+        ptr = content_list->next;
+        while (ptr != NULL) {
+            len = strlen(ptr->str);
+            if (ptr->un.flag == True || len  <= 1) {
+                PDEBUG ("%s will not saved.\n", ptr->str);
                 continue;
+            }
             else {
-                strncpy(tmp, p->str, strlen(p->str));
+                memset(tmp, 0, 256);
+                strncpy(tmp, ptr->str, len);
                 strcat(tmp, "\n");
                 array[i] = strndup(tmp, strlen(tmp));
             }
             i++;
+            ptr = ptr->next;
         }
+
+        PDEBUG ("Send to qsort!\n");
         qsort((void *)&array[0], size, sizeof(char *), cmpstringgp);
     }
+    PDEBUG ("return\n");
+
     return array;
 }
 
@@ -216,22 +232,27 @@ int dump2file(const char *path)
     if (array == NULL) {
         fprintf(stderr, "ERROR: failed to convert list into string"
                 "Items will be recorded without order.");
-        list_for_each(ptr, &content_list){
-            p = list_entry(ptr, str_list, head);
-            if (p->flag == True || strlen(p->str) == 1)
+        int len;
+        str_list *ptr = content_list->next;
+        while (ptr != NULL) {
+            len = strlen(ptr->str);
+            if (ptr->un.flag == True || len <= 1) {
+                PDEBUG ("%s will not saved.\n", ptr->str);
                 continue;
+            }
             else {
-                writen = write(fd, p->str, strlen(p->str));
+                writen = write(fd, ptr->str, len);
                 if (writen == -1)
                     oops("Failed to write:");
                 writen = write(fd, "\n", 1);
             }
+            ptr = ptr->next;
         }
     }
     else {
         int i;
         char *str;
-        for (i = 0; i < content_list.counter; i++) {
+        for (i = 0; i < content_list->un.counter; i++) {
             str = array[i];
             writen = write(fd, str, strlen(str));
             if (writen < 0) {
@@ -257,7 +278,7 @@ int dump2file(const char *path)
         unlink(tmpl);
         chmod(path,  S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
         printf("Finished to write file: %s, total items: %d\n",
-               path, content_list.counter);
+               path, content_list->un.counter);
     }
     return 0;
 }
@@ -287,17 +308,14 @@ int read_content(const char *path)
         oops("Failed to open file");
     }
     while ((read = getline(&item, &n, fd)) != -1) {
-        if (strlen(item) == 1) 			/* Nothing but a newline, skip it. */
+        if (strlen(item) <= 1) 			/* Nothing but a newline, skip it. */
             continue;
 
         p = (str_list *) malloc(sizeof(str_list));
         memset(p, 0, sizeof(str_list));
-
-        tmp = (char *)calloc(strlen(item), 1);
-        strncpy(tmp, item, strlen(item)-1);
-        p->str = tmp;
-        list_add(&p->head, &content_list);
-        content_list.counter ++;
+        p->str = strdup(item);
+        list_add(content_list, p);
+        content_list->un.counter ++;
     }
     if (item)
         free(item);
@@ -314,15 +332,14 @@ int read_content(const char *path)
  */
 str_list *key_exist(const char *key)
 {
-    str_list *p = NULL;
-    struct list_head *ptr = NULL;
+    str_list *ptr = content_list->next;
 
-    list_for_each(ptr, &content_list){
-        p = list_entry(ptr, str_list, head);
-        if (strstr(p->str, key)) {
-            printf ("Found entry: %s\n", p->str);
-            return p;
+    while (ptr) {
+        if (strstr(ptr->str, key)) {
+            printf ("Found entry: %s\n", ptr->str);
+            return ptr;
         }
+        ptr = ptr->next;
     }
     return NULL;
 }
@@ -347,6 +364,9 @@ int merge_use(str_list *p, const char *new)
     char tmp[1024];
 
     memset(new_item, 0, 1024);
+
+    PDEBUG ("Old str: %s, new: %s\n", p->str, new);
+
 
     /* Caculate size to alloc. */
     while (item_old[i]) {
@@ -449,6 +469,9 @@ int merge_use(str_list *p, const char *new)
         }
         i++;
     }
+    PDEBUG ("new_item: %s\n", new_item);
+
+    free(p->str);
     p->str = strdup(new_item);
     return 0;
 }
@@ -518,8 +541,8 @@ int add_obj(object obj, const char *input_str)
         p = (str_list *) malloc(sizeof(str_list));
         memset(p, 0, sizeof(str_list));
         p->str = strdup(input_str);
-        list_add(&p->head, &content_list);
-        content_list.counter ++;
+        list_add(content_list, p);
+        content_list->un.counter ++;
         break;
     }
     default:
@@ -541,9 +564,7 @@ dump_add:
 int list_obj(object obj, const char *key)
 {
     char *path;
-    str_list *p = NULL;
-    struct list_head *ptr = NULL;
-
+    str_list *ptr;
     printf("List entry in %s.\n", obj_desc[obj]);
 
     path = get_path(obj);
@@ -558,14 +579,16 @@ int list_obj(object obj, const char *key)
         return -1;
     }
 
-    printf("Total entries: %d\n", content_list.counter);
+    printf("Total entries: %d\n", content_list->un.counter);
+    ptr = content_list->next;
 
     if (strlen(key) == 0) {
         /* All items will be displayed. */
         printf("Display all items:\n");
-        list_for_each(ptr, &content_list){
-            p = list_entry(ptr, str_list, head);
-            printf ("    %s\n", p->str);
+        ptr = content_list->next;
+        while (ptr) {
+            printf("    %s\n", ptr->str);
+            ptr = ptr->next;
         }
     }
     else {
@@ -573,14 +596,13 @@ int list_obj(object obj, const char *key)
         char *item = NULL;
         int i = 0;
         printf("Found entries including (%s):\n", key);
-        list_for_each(ptr, &content_list) {
-            i = 0;
-            p = list_entry(ptr, str_list, head);
+        while (ptr) {
             while (margv[i]) {
-                if (strstr(strsplit(p->str)[0], margv[i]))
-                    printf ("    %s\n", p->str);
+                if (strstr(strsplit(ptr->str)[0], margv[i]))
+                    printf ("    %s\n", ptr->str);
                 i++;
             }
+            ptr = ptr->next;
         }
         free_array(margv);
     }
@@ -597,8 +619,7 @@ int list_obj(object obj, const char *key)
  */
 int del_obj(object obj, const char *input_str)
 {
-    str_list *p = NULL;
-    struct list_head *ptr = NULL;
+    str_list *ptr = content_list->next;
     int counter = 0, i = 0, ret = 0;
     char * path = get_path(obj);
     char c;
@@ -624,14 +645,14 @@ int del_obj(object obj, const char *input_str)
     char **margv = strsplit(input_str);
 
     while (margv[i]) {
-        list_for_each(ptr, &content_list){
-            p = list_entry(ptr, str_list, head);
-            if (strstr(p->str, margv[i])) {
-                printf ("Item: %s", p->str);
-                p->flag = True;
-                content_list.counter --;
+        while (ptr) {
+            if (strstr(ptr->str, margv[i])) {
+                printf ("Item: %s", ptr->str);
+                ptr->un.flag = True;
+                content_list->un.counter --;
                 counter++;
             }
+            ptr = ptr->next;
         }
         i++;
     }
@@ -641,10 +662,12 @@ int del_obj(object obj, const char *input_str)
 
     if (counter > 1) {
         printf ("Muliple items will be removed, as bellow:\n");
-        list_for_each(ptr, &content_list){
-            p = list_entry(ptr, str_list, head);
-            if (p->flag == True)
-                printf ("\t%s\n", p->str);
+        ptr = content_list->next;
+        while (ptr) {
+            if (ptr->un.flag == True) {
+                printf ("\t%s\n", ptr->str);
+            }
+            ptr = ptr->next;
         }
         printf ("Are you sure to do this?(Y or N)[Y]\n");
         c = fgetc(stdin);
@@ -700,40 +723,41 @@ int process_file(const char *fpath, const struct stat *sb, int typeflag)
 
         bname = basename(strdup(ptr));
         to_keep = strdup(fpath);
-        list_for_each(pptr, &source_list){
-            p = list_entry(pptr, name_version, head);
-            if (strcmp(name_split(basename(strdup(p->name))),
+        name_version *ptr = source_list->next;
+        while (ptr) {
+            if (strcmp(name_split(basename(strdup(ptr->name))),
                        bname) == 0) {
                 found = 1;
                 deleted ++;
-                if (p->version < sb->st_mtime) {
-                    to_delete = strdup(p->name);
+                if (ptr->version < sb->st_mtime) {
+                    to_delete = strdup(ptr->name);
                     /* Update statistics */
-                    freed_size += p->size;
+                    freed_size += ptr->size;
                     /* Update source info. */
-                    p->name = strdup(fpath);
-                    p->version = sb->st_mtime;
+                    ptr->name = strdup(fpath);
+                    ptr->version = sb->st_mtime;
                 }
                 else {
                     to_delete = strdup(fpath);
-                    to_keep = strdup(p->name);
+                    to_keep = strdup(ptr->name);
                     freed_size += sb->st_size;
                 }
                 break;
             }
+            ptr = ptr->next;
         }
 
-        p = calloc(sizeof(name_version), 1);
+        ptr = calloc(sizeof(name_version), 1);
         if (found == 0) { /* Add file into source_list. */
-            p->name    = strdup(to_keep);
-            p->version = sb->st_mtime;
-            p->size    = sb->st_size;
-            list_add(&p->head, &source_list);
+            ptr->name    = strdup(to_keep);
+            ptr->version = sb->st_mtime;
+            ptr->size    = sb->st_size;
+            list_add((str_list *)source_list, ptr);
         }
         else {  /* Add file into del_list if found was set. */
-            p->name    = strdup(to_delete);
-            p->to_keep = strdup(to_keep);
-            list_add(&p->head, &del_list);
+            ptr->name    = strdup(to_delete);
+            ptr->to_keep = strdup(to_keep);
+            list_add((str_list *)del_list, ptr);
         }
     }
     return 0;
@@ -750,22 +774,20 @@ int real_delete(int doit)
 {
     int ret = 0;
     int i = 0;
-    struct list_head *pptr = NULL;
-    name_version     *p   = NULL;
+    name_version     *ptr   = del_list->next;
     if (doit) { /* Real action to delete file!*/
-        list_for_each(pptr, &del_list){
-            p = list_entry(pptr, name_version, head);
-            ret = unlink(p->name);
+        while (ptr) {
+            ret = unlink(ptr->name);
             if (ret == -1)
-                oops ("Failed to unlink file: %s\n", p->name);
+                oops ("Failed to unlink file: %s\n", ptr->name);
+            ptr = ptr->next;
         }
     }
     else { /* Not really delete, but display files to be removed. */
         printf ("To be deleted: \n");
-        list_for_each(pptr, &del_list){
-            p = list_entry(pptr, name_version, head);
-            printf ("\t%03d DEL:  %s\n", i, p->name);
-            printf ("\t    KEEP: %s\n", p->to_keep);
+        while (ptr) {
+            printf ("\t%03d DEL:  %s\n", i, ptr->name);
+            printf ("\t    KEEP: %s\n", ptr->to_keep);
             i++;
         }
     }
@@ -781,8 +803,15 @@ int cleanup_localdist_resources()
 {
     int ret;
     char c;
-    INIT_LIST_HEAD(&source_list);
-    INIT_LIST_HEAD(&del_list);
+    PDEBUG ("enter\n");
+
+    if (source_list == NULL) {
+        source_list = malloc(sizeof(name_version));
+        memset(source_list, 0, sizeof(name_version));
+    }
+
+    INIT_LIST(source_list, name_version);
+    INIT_LIST(del_list, name_version);
 
     printf ("Scanning local resources...\n");
     ret = ftw(dist_path, process_file, 0);
@@ -804,6 +833,8 @@ int cleanup_localdist_resources()
         }
     }
  out:
+    PDEBUG ("leave\n");
+
     return ret;
 }
 
@@ -825,7 +856,10 @@ int main(int argc, char **argv)
     char items[1024];
     int err_flag = 0;
 
-    INIT_LIST_HEAD(&content_list);
+    PDEBUG ("enter\n");
+
+
+    INIT_LIST(content_list, str_list);
 
     /* Parse options from command line, store them into TYPE and OBJ */
     while (1) {
@@ -974,5 +1008,8 @@ int main(int argc, char **argv)
 
     /* It is not a daemon, and allocated memory will be released after this
      * app quit. */
+
+    PDEBUG ("leave\n");
+
     return ret;
 }

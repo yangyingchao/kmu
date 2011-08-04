@@ -5,7 +5,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-#include "list.h"
 
 #define True  1
 #define False 0
@@ -22,6 +21,15 @@
 #else
 #define PDEBUG(fmt, args...)  ;
 #endif
+
+#ifdef DEBUG
+#define PRINT_DEBUG(format, args...)                        \
+    printf("%s(%d)-%s:\t",__FILE__,__LINE__,__FUNCTION__);  \
+    printf("\033[31m"format"\033[0m", ##args);
+#else
+#define PRINT_DEBUG(format, args...)
+#endif
+
 
 extern const char *dist_path;
 /* Action types */
@@ -43,37 +51,47 @@ typedef enum _object{
 } object;
 
 typedef struct _type2path {
-    object obj;
-    char *path;
+    object  obj;
+    char   *path;
 } type2path;
 
 typedef struct _str_list {
-    struct list_head  head;
+    struct _str_list *next;
     char             *str;
-    char              flag;
+    union{
+        int counter; // counter for root node.
+        int flag;    // Flag for leaves.
+    } un;
 } str_list;
 
 typedef struct _name_version {
-    struct list_head  head;
-    char             *name;
-    char             *to_keep;
-    time_t            version;
-    size_t            size;
+    struct _name_version *next;
+    char                 *name;
+    char                 *to_keep;
+    time_t                version;
+    size_t                size;
 } name_version;
-
-#ifdef DEBUG
-#define PRINT_DEBUG(format, args...)                            \
-    printf("%s(%d)-%s:\t",__FILE__,__LINE__,__FUNCTION__);      \
-    printf("\033[31m"format"\033[0m", ##args);
-#else
-#define PRINT_DEBUG(format, args...)
-#endif
 
 
 char **strsplit(const char *str);
 int should_reserve(const char *key);
 char *name_split(const char *fullname);
 void free_array(char **array);
+
+void list_add(str_list *root, void *new);
+
+#define INIT_LIST(instance, type) do {                                  \
+        if (instance == NULL) {                                         \
+            instance = (type *)malloc(sizeof(type));                    \
+            if (instance == NULL) {                                     \
+                fprintf(stderr, "ERROR: failed to alloc memory.\n");    \
+                return -1;                                              \
+            }                                                           \
+            memset(instance, 0, sizeof(type));                          \
+        }                                                               \
+    } while (0);
+
+
 #endif /* _UTIL_H_ */
 /*
  * Editor modelines
