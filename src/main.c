@@ -145,7 +145,7 @@ int cmpstringgp(const void *p1, const void *p2)
         pp2 ++;
     }
 
-    return (0 - strcmp(pp1, pp2));
+    return strcmp(pp1, pp2);
 }
 
 
@@ -589,7 +589,7 @@ int list_obj(object obj, const char *key)
         printf("Display all items:\n");
         ptr = content_list->next;
         while (ptr) {
-            printf("    %s\n", ptr->str);
+            printf("    %s", ptr->str);
             ptr = ptr->next;
         }
     }
@@ -605,7 +605,7 @@ int list_obj(object obj, const char *key)
             while (ptr) {
                 items = strsplit(ptr->str);
                 if (strstr(items[0], margv[i]))
-                    printf ("    %s\n", ptr->str);
+                    printf ("    %s", ptr->str);
                 free_array(items);
                 ptr = ptr->next;
             }
