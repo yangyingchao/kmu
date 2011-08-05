@@ -2,6 +2,7 @@
 ;; EDE project file.
 (ede-proj-project "kmu"
   :name "kmu"
+  :version "1.0.1"
   :file "Project.ede"
   :targets 'nil
   :makefile-type 'Makefile.am

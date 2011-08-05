@@ -160,6 +160,7 @@ char **list_to_array()
 
     int size = content_list->un.counter;
     if (size <= 0) {
+        printf("Empty list!\n");
         return NULL;
     }
 
@@ -228,7 +229,6 @@ int dump2file(const char *path)
         oops("Failed to mktemp");
 
     char **array = list_to_array();
-    /* char **array = NULL; */
     if (array == NULL) {
         fprintf(stderr, "ERROR: failed to convert list into string"
                 "Items will be recorded without order.\n");
@@ -236,9 +236,9 @@ int dump2file(const char *path)
         str_list *ptr = content_list->next;
         while (ptr != NULL) {
             len = strlen(ptr->str);
+            PDEBUG ("%p, next: %p\n", ptr, ptr->next);
             if (ptr->un.flag == True || len <= 1) {
                 PDEBUG ("%s will not saved.\n", ptr->str);
-                continue;
             }
             else {
                 writen = write(fd, ptr->str, len);
@@ -314,6 +314,7 @@ int read_content(const char *path)
         p = (str_list *) malloc(sizeof(str_list));
         memset(p, 0, sizeof(str_list));
         p->str = strdup(item);
+        p->next = NULL;
         list_add(content_list, p);
         content_list->un.counter ++;
     }
@@ -673,17 +674,22 @@ int del_obj(object obj, const char *input_str)
         ptr = content_list->next;
         while (ptr) {
             if (ptr->un.flag == True) {
-                printf ("\t%s\n", ptr->str);
+                printf ("\t%s", ptr->str);
             }
             ptr = ptr->next;
         }
         printf ("Are you sure to do this?(Y or N)[Y]\n");
         c = fgetc(stdin);
         if ((c == 'Y') || (c == 'y')) {
+            content_list->un.counter -= counter;
             ret= dump2file(path);
+        }
+        else {
+            printf("Skipped.\n");
         }
     }
     else if (counter == 1) {
+        content_list->un.counter -= 1;
         ret = dump2file(path);
     }
     else

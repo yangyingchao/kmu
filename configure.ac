@@ -10,7 +10,7 @@
 # Process this file with autoconf to produce a configure script
 
 AC_INIT(Project.ede)
-AM_INIT_AUTOMAKE([kmu], 1.0)
+AM_INIT_AUTOMAKE([kmu], 1.0.1)
 AM_CONFIG_HEADER(config.h)
 AC_PROG_CC
 AC_PROG_GCC_TRADITIONAL
