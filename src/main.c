@@ -283,6 +283,35 @@ int dump2file(const char *path)
     return 0;
 }
 
+/**
+ * Judge whether this item should be skipped.
+ *
+ * It may be skiped because:
+ *    1. It's empty or nothing but new line.
+ *    2. It starts with a # (a comment).
+ *
+ * @param item - Character item
+ *
+ * @return: bool
+ */
+int should_skip(char *item)
+{
+    PDEBUG ("called: %s\n", item);
+
+    int ret = 0;
+    if (strlen(item) <= 1)	/* Nothing but a newline, skip it. */
+        ret = 1;
+    else {
+        char *tmp = item;
+        while (*tmp == ' ') {
+            tmp ++;
+        }
+        if (*tmp == '\0' || *tmp == '#') {
+            ret = 1;
+        }
+    }
+    return ret;
+}
 
 /**
  * read_content - Read content of file into the global list.
@@ -308,16 +337,30 @@ int read_content(const char *path)
         oops("Failed to open file");
     }
     while ((read = getline(&item, &n, fd)) != -1) {
-        if (strlen(item) <= 1) 			/* Nothing but a newline, skip it. */
-            continue;
+        PDEBUG ("item: %s\n", item);
 
+        if (should_skip(item)) {
+            printf("Skip item: %s\n", item);
+            goto next;
+        }
+
+        PDEBUG ("Storing item: %s\n", item);
         p = (str_list *) malloc(sizeof(str_list));
         memset(p, 0, sizeof(str_list));
         p->str = strdup(item);
         p->next = NULL;
         list_add(content_list, p);
         content_list->un.counter ++;
+    next:
+        if (item) {
+            PDEBUG ("freeing\n");
+            free(item);
+        }
+        item = NULL;
+        continue;
     }
+    PDEBUG ("End of loop\n");
+
     if (item)
         free(item);
 
