@@ -57,7 +57,7 @@ name_version *source_list;
 name_version *del_list;
 str_list *content_list = NULL;
 
-static type2path path_base[] = {
+static const type2path path_base[] = {
     { KEYWORD, 	"/etc/portage/package.keywords/keywords"},
     { MASK, 	"/etc/portage/package.mask/mask"},
     { USE, 		"/etc/portage/package.use/use" },
@@ -65,7 +65,7 @@ static type2path path_base[] = {
     { 0, 		NULL},
 };
 
-static char * obj_desc[] = {
+static const char * obj_desc[] = {
     "Ubknown object",
     "Keyword",
     "Mask",
@@ -73,7 +73,7 @@ static char * obj_desc[] = {
     "Unmask"
 };
 
-static verbose = 0;
+static int verbose = 0;
 
 #define PRINT_VERBOSE(format, args...)                            \
     if (verbose)\
