@@ -7,6 +7,7 @@
 #include <time.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 const char *dist_path = "/usr/portage/distfiles/";
 
@@ -147,3 +148,38 @@ void list_add(str_list *root, void *new)
     ptr->next = new;
 }
 
+
+int dir_exist(const char *path)
+{
+        if (!path)
+                return -1;
+
+        int ret;
+        ret = access(path, F_OK);
+        if (ret < 0) 
+                return -1;
+        struct stat sb;
+        if ((ret = stat(path, &sb)) == 0) {
+                if (S_ISDIR(sb.st_mode)) 
+                        return 0;
+        }
+        return -1;
+}
+
+
+int file_exist(const char *path)
+{
+        if (!path)
+                return -1;
+
+        int ret;
+        ret = access(path, F_OK);
+        if (ret < 0) 
+                return -1;
+        struct stat sb;
+        if ((ret = stat(path, &sb)) == 0) {
+                if (S_ISREG(sb.st_mode)) 
+                        return 0;
+        }
+        return -1;
+}

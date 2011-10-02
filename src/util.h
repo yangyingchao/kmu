@@ -80,6 +80,8 @@ void free_array(char **array);
 
 void list_add(str_list *root, void *new);
 
+int dir_exist(const char *path);
+int file_exist(const char *path);
 #define INIT_LIST(instance, type) do {                                  \
         if (instance == NULL) {                                         \
             instance = (type *)malloc(sizeof(type));                    \

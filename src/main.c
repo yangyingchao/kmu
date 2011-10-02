@@ -222,6 +222,16 @@ int dump2file(const char *path)
         return -1;
     }
 
+    char *dirn = dirname(strdup(path));
+    if (dirn == NULL) 
+            oops ("Failed to get dirname");
+    printf("Dirname: %s\n", dirn);
+    if (dir_exist(dirn) != 0) {
+            ret = mkdir(dirn, 0644);
+            if(ret)
+                    oops("Failed to create directory.");
+    }
+
     char tmpl[256] = {'0'};
     sprintf(tmpl, "%s-XXXXXX", path);
     fd = mkstemp(tmpl);
@@ -916,6 +926,10 @@ int main(int argc, char **argv)
 
     PDEBUG ("enter\n");
 
+    if (geteuid() != 0) {
+            fprintf(stderr, "Should be executed as root!\n");
+            exit(1);
+    }
 
     INIT_LIST(content_list, str_list);
 
