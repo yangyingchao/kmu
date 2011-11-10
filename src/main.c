@@ -186,6 +186,8 @@ char **list_to_array()
                 continue;
             }
             else {
+                PDEBUG ("str: %s\n", ptr->str);
+
                 memset(tmp, 0, 256);
                 strncpy(tmp, ptr->str, len);
                 if (*(ptr->str+len-1) != '\n') {
@@ -223,7 +225,7 @@ int dump2file(const char *path)
     }
 
     char *dirn = dirname(strdup(path));
-    if (dirn == NULL) 
+    if (dirn == NULL)
             oops ("Failed to get dirname");
     printf("Dirname: %s\n", dirn);
     if (dir_exist(dirn) != 0) {
@@ -306,8 +308,6 @@ int dump2file(const char *path)
  */
 int should_skip(char *item)
 {
-    PDEBUG ("called: %s\n", item);
-
     int ret = 0;
     if (strlen(item) <= 1)	/* Nothing but a newline, skip it. */
         ret = 1;
@@ -354,7 +354,6 @@ int read_content(const char *path)
             goto next;
         }
 
-        PDEBUG ("Storing item: %s\n", item);
         p = (str_list *) malloc(sizeof(str_list));
         memset(p, 0, sizeof(str_list));
         p->str = strdup(item);
@@ -363,7 +362,6 @@ int read_content(const char *path)
         content_list->un.counter ++;
     next:
         if (item) {
-            PDEBUG ("freeing\n");
             free(item);
         }
         item = NULL;
