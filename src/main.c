@@ -865,38 +865,55 @@ int real_delete(int doit)
  *
  * @return: 0 if succeeded, or non-zero otherwise.
  */
-int cleanup_localdist_resources()
+int cleanup_localdist_resources(object obj)
 {
     int ret;
     char c;
     PDEBUG ("enter\n");
 
-    if (source_list == NULL) {
-        source_list = malloc(sizeof(name_version));
-        memset(source_list, 0, sizeof(name_version));
-    }
-
-    INIT_LIST(source_list, name_version);
-    INIT_LIST(del_list, name_version);
-
-    printf ("Scanning local resources...\n");
-    ret = ftw(dist_path, process_file, 0);
-    if (deleted == 0) {
-        printf ("No outdated file found!\n");
-        goto out;
-    }
-    ret = real_delete(0);
-    printf ("Going to deleted %d files,  %dM diskspace will be freed.\n",
-            deleted,  freed_size/1024/1024);
-    printf ("Keep going? [Y]\n");
-    c = fgetc(stdin);
-    if (c == 'N' || c == 'n')
-        printf ("Files are not deleted.\n");
-    else{
-        ret = real_delete(1);
-        if (ret) {
-            fprintf(stderr, "ERROR: Failed to execute delete command!\n");
+    if (obj == UNKNOWN) {
+        printf("Cleaning up distfiles.\n");
+        if (source_list == NULL) {
+            source_list = malloc(sizeof(name_version));
+            memset(source_list, 0, sizeof(name_version));
         }
+
+        INIT_LIST(source_list, name_version);
+        INIT_LIST(del_list, name_version);
+
+        printf ("Scanning local resources...\n");
+        ret = ftw(dist_path, process_file, 0);
+        if (deleted == 0) {
+            printf ("No outdated file found!\n");
+            goto out;
+        }
+        ret = real_delete(0);
+        printf ("Going to deleted %d files,  %dM diskspace will be freed.\n",
+                deleted,  freed_size/1024/1024);
+        printf ("Keep going? [Y]\n");
+        c = fgetc(stdin);
+        if (c == 'N' || c == 'n')
+            printf ("Files are not deleted.\n");
+        else{
+            ret = real_delete(1);
+            if (ret) {
+                fprintf(stderr, "ERROR: Failed to execute delete command!\n");
+            }
+        }
+    }
+    else {
+        char *path = get_path(obj);
+        if (path == NULL) {
+            fprintf(stderr, "ERROR: Failed to convert type to path\n");
+            exit(1);
+        }
+        printf("Cleaning file: %s\n", path);
+        if (read_content(path) == -1) {
+            fprintf(stderr, "ERROR: Failed to read content of file: %s!\n",
+                    path);
+            exit(1);
+        }
+        ret = dump2file(path);
     }
  out:
     PDEBUG ("leave\n");
@@ -1066,7 +1083,7 @@ int main(int argc, char **argv)
         break;
     }
     case CLEANUP:{
-        ret = cleanup_localdist_resources();
+        ret = cleanup_localdist_resources(obj);
         break;
     }
     default:
