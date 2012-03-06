@@ -25,7 +25,6 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include <error.h>
 #include <errno.h>
 #include <sys/stat.h>
 #include <ftw.h>
@@ -91,9 +90,18 @@ char * get_path(object obj)
 {
     int idx = 0;
     int N   =  sizeof(path_base)/sizeof(type2path);
+    char* prefix = NULL;
+    prefix = getenv("EPREFIX");
     for (idx = 0; idx < N; idx++) {
         if (path_base[idx].obj == obj) {
-            return path_base[idx].path;
+            if (prefix)
+            {
+                return strcat(prefix, path_base[idx].path);
+            }
+            else
+            {
+                return path_base[idx].path;
+            }
         }
     }
     return NULL;
@@ -942,8 +950,7 @@ int main(int argc, char **argv)
     PDEBUG ("enter\n");
 
     if (geteuid() != 0) {
-            fprintf(stderr, "Should be executed as root!\n");
-            exit(1);
+            fprintf(stderr, "Should be executed as root, do not complain if you are not!\n");
     }
 
     INIT_LIST(content_list, str_list);

@@ -15,6 +15,14 @@
 
 @SET_MAKE@
 
+# Automatically Generated Makefile by EDE.
+# For use with: automake
+#
+# DO NOT MODIFY THIS FILE OR YOUR CHANGES MAY BE LOST.
+# EDE is the Emacs Development Environment.
+# http://cedet.sourceforge.net/ede.shtml
+#
+
 VPATH = @srcdir@
 pkgdatadir = $(datadir)/@PACKAGE@
 pkgincludedir = $(includedir)/@PACKAGE@
@@ -185,15 +193,6 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-
-# Automatically Generated Makefile by EDE.
-# For use with: automake
-#
-# DO NOT MODIFY THIS FILE OR YOUR CHANGES MAY BE LOST.
-# EDE is the Emacs Development Environment.
-# http://cedet.sourceforge.net/ede.shtml
-#
-AM_CFLAGS = -DDEBUG
 top = ../
 ede_FILES = Project.ede Makefile.am
 SUBDIRS = 

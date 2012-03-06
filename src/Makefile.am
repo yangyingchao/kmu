@@ -5,7 +5,6 @@
 # EDE is the Emacs Development Environment.
 # http://cedet.sourceforge.net/ede.shtml
 #
-AM_CFLAGS=-DDEBUG
 
 top=../
 ede_FILES=Project.ede Makefile.am
