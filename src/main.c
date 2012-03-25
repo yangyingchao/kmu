@@ -1,5 +1,5 @@
 /***************************************************************************
- *  Copyright (C) 2010-2011 yangyingchao@gmail.com
+ *  Copyright (C) 2010-2012 yangyingchao@gmail.com
 
  *  Author: yangyingchao <yangyingchao@gmail.com>
 
@@ -25,7 +25,6 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include <error.h>
 #include <errno.h>
 #include <sys/stat.h>
 #include <ftw.h>
@@ -91,9 +90,18 @@ char * get_path(object obj)
 {
     int idx = 0;
     int N   =  sizeof(path_base)/sizeof(type2path);
+    char* prefix = NULL;
+    prefix = getenv("EPREFIX");
     for (idx = 0; idx < N; idx++) {
         if (path_base[idx].obj == obj) {
-            return path_base[idx].path;
+            if (prefix)
+            {
+                return strcat(prefix, path_base[idx].path);
+            }
+            else
+            {
+                return path_base[idx].path;
+            }
         }
     }
     return NULL;
@@ -226,12 +234,13 @@ int dump2file(const char *path)
 
     char *dirn = dirname(strdup(path));
     if (dirn == NULL)
-            oops ("Failed to get dirname");
+        oops ("Failed to get dirname");
     printf("Dirname: %s\n", dirn);
     if (dir_exist(dirn) != 0) {
-            ret = mkdir(dirn, 0644);
-            if(ret)
-                    oops("Failed to create directory.");
+        umask(000);
+        ret = mkdir(dirn, S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH);
+        if(ret)
+            oops("Failed to create directory.");
     }
 
     char tmpl[256] = {'0'};
@@ -942,8 +951,7 @@ int main(int argc, char **argv)
     PDEBUG ("enter\n");
 
     if (geteuid() != 0) {
-            fprintf(stderr, "Should be executed as root!\n");
-            exit(1);
+            fprintf(stderr, "Should be executed as root, do not complain if you are not!\n");
     }
 
     INIT_LIST(content_list, str_list);

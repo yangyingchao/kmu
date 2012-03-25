@@ -11,6 +11,7 @@
     :configuration-variables 'nil
     )
    )
+  :configuration-default "release"
   :makefile-type 'Makefile.am
   :configuration-variables '(("debug" ("AM_CFLAGS" . "-DDEBUG")))
   )
