@@ -1,2 +1,13 @@
 *.o
 .deps/
+Makefile
+autom4te.cache/
+config.h
+config.log
+config.status
+GPATH
+GRTAGS
+GTAGS
+core
+kmu
+stamp-h1

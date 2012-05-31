@@ -777,6 +777,8 @@ int process_file(const char *fpath, const struct stat *sb, int typeflag)
     char *to_delete = NULL;
     char *to_keep = NULL;
 
+    // @todo: do not scan subdirectories.
+
     if (typeflag == FTW_F) {
         /*
          * Skip reserved files, Reason:
