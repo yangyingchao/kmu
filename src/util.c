@@ -16,10 +16,9 @@ static char name_tmp[256];
 /* All samba packages will be left. */
 const char *reserved[] = {
     "samba",
-    "patch",
     "linux",
     "firefox",
-    0
+    NULL
 };
 
 /**
@@ -111,12 +110,22 @@ char * name_split(const char *fullname)
         return NULL;
     }
 
+    // Name-Version
     for (ptr = name_tmp; *ptr; ptr++) {
         if (*ptr == '-' && *(ptr+1) >= '0' && *(ptr+1) <= '9') {
             *ptr = '\0';
             return strdup(name_tmp);
         }
     }
+
+    // Name_Version
+    for (ptr = name_tmp; *ptr; ptr++) {
+        if ((*ptr == '-' || *ptr == '_') && *(ptr+1) >= '0' && *(ptr+1) <= '9') {
+            *ptr = '\0';
+            return strdup(name_tmp);
+        }
+    }
+
     return NULL;
 }
 
@@ -182,4 +191,109 @@ int file_exist(const char *path)
                         return 0;
         }
         return -1;
+}
+
+
+// Hash table operations.
+
+void HashTableDestroy(HashTable* table)
+{
+    if (table)
+    {
+        if (table->entries)
+        {
+            int i = 0;
+            for (; i < table->capacity; ++i)
+            {
+                TableEntry* entry = &table->entries[i];
+                if (entry->key)
+                {
+                    free(entry->key);
+                }
+                if (entry->val && table->deFunctor)
+                {
+                    table->deFunctor(entry->val);
+                }
+            }
+            free(table->entries);
+        }
+        free(table);
+    }
+}
+
+HashTable* HashTableCreate(uint32 hashSize, HashFunction cFunctor, DestroyFunction dFunctor)
+{
+    HashTable* table = malloc(sizeof(HashTable));
+    if (table)
+    {
+        memset(table, 0, sizeof(HashTable));
+
+        table->capacity    = hashSize;
+        table->entries     = malloc(sizeof(TableEntry) * hashSize);
+        table->hashFunctor = cFunctor;
+        table->deFunctor   = dFunctor;
+
+        if (table->entries)
+        {
+            memset(table->entries, 0, sizeof(TableEntry) * hashSize);
+        }
+        else
+        {
+            HashTableDestroy(table);
+            table = NULL;
+        }
+    }
+    return table;
+}
+
+int InsertEntry(HashTable* table, char* key, void* val)
+{
+    int ret = 0;
+    if (!table || !key || !val )
+    {
+        return ret;
+    }
+
+    PDEBUG ("KEY: %s, val: %p\n", key, val);
+
+    uint32 index = table->hashFunctor(key);
+    // Insert entry into the first open slot starting from index.
+    uint32 i;
+    for (i = index; i < table->capacity; ++i)
+    {
+        TableEntry* entry = &table->entries[i];
+        if (entry->key == NULL)
+        {
+            ret        = 1;
+            entry->key = key;
+            entry->val = val;
+            break;
+        }
+    }
+    return ret;
+}
+
+void* GetEntryFromHashTable(HashTable* table, char* key)
+{
+    TableEntry* entry = NULL;
+    uint32 index = table->hashFunctor(key);
+    int i;
+    for (i = index; i < table->capacity; ++i)
+    {
+        entry = &table->entries[i];
+        if (entry->key == NULL)
+        {
+            return NULL;
+        }
+        if (strcmp(entry->key, key) == 0)
+        {
+            break;
+        }
+    }
+    if (entry)
+    {
+        PDEBUG("Key: %s - %s, val: %p\n",
+               key, entry->key, entry->val);
+    }
+    return entry->val;
 }

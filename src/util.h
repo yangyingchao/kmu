@@ -14,6 +14,8 @@
     {fprintf(stderr,ch,##args);perror("Reason from system call: ");return -1;}
 
 
+// #define DEBUG       1
+
 #ifdef DEBUG
 #define PDEBUG(fmt, args...)                                \
     printf("%s(%d)-%s:\t",__FILE__,__LINE__,__FUNCTION__);  \
@@ -30,6 +32,7 @@
 #define PRINT_DEBUG(format, args...)
 #endif
 
+typedef unsigned int   uint32;
 
 extern const char *dist_path;
 /* Action types */
@@ -64,15 +67,45 @@ typedef struct _str_list {
     } un;
 } str_list;
 
-typedef struct _name_version {
-    struct _name_version *next;
-    char                 *name;
-    char                 *to_keep;
-    time_t                version;
-    size_t                size;
-} name_version;
+typedef struct _NameList
+{
+    char* name;
+    struct _NameList* next;
+} NameList;
 
+typedef struct _PkgInfo {
+    char*     fullPath;                 /*!< Full Path of latest file. */
+    long      version;                  /*!< Version of latest file  */
+    long      size;                     /*!< Size of latest file  */
+    NameList* del_list;                 /*!< List of files of older version. */
+} PkgInfo;
 
+typedef void (*DestroyFunction)(void* data);
+
+typedef uint32  (*HashFunction)(const char* key);
+
+// Hash Tables.
+typedef struct _TableEntry
+{
+    char* key;
+    void* val;
+} TableEntry;
+
+typedef struct _HashTable
+{
+    int         capacity;
+    TableEntry* entries;
+
+    HashFunction    hashFunctor;
+    DestroyFunction deFunctor;
+} HashTable;
+
+void HashTableDestroy(HashTable* table);
+HashTable* HashTableCreate(uint32 size, HashFunction cFunctor, DestroyFunction dFunctor);
+int InsertEntry(HashTable* table, char* key, void* val);
+void* GetEntryFromHashTable(HashTable* table, char* key);
+
+// Functions.
 char **strsplit(const char *str);
 int should_reserve(const char *key);
 char *name_split(const char *fullname);
@@ -93,6 +126,25 @@ int file_exist(const char *path);
         }                                                               \
     } while (0);
 
+// Seek to list tail and create new empty.
+#define SEEK_LIST_TAIL(lst, ptr, type)                      \
+    do                                                      \
+    {                                                       \
+        ptr = lst;                                          \
+        while (ptr)                                         \
+        {                                                   \
+            if (ptr->next == NULL)                          \
+            {                                               \
+                ptr->next = (type*) malloc(sizeof(type));   \
+                memset(ptr->next, 0, sizeof(type));         \
+                break;                                      \
+            }                                               \
+            else                                            \
+            {                                               \
+                ptr = ptr->next;                            \
+            }                                               \
+        }                                                   \
+    } while (0)                                             \
 
 #endif /* _UTIL_H_ */
 /*
