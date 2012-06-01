@@ -36,9 +36,9 @@
     do { perror(msg); exit(EXIT_FAILURE); } while (0)
 
 #ifdef __APPLE__
-#define TIME_TO_LONG(X) X.tv_sec
+#define GET_TIME(X) (X)->st_mtimespec.tv_sec
 #else
-#define TIME_TO_LONG(X) X
+#define GET_TIME(X) (X)->st_mtime
 #endif
 
 /* Options will be parsed */
@@ -824,10 +824,14 @@ void PkgInfoDestroy(void *data)
         if (pkg->del_list)
         {
             NameList* ptr = pkg->del_list;
+            NameList* tmp;
             while (ptr != NULL)
             {
-                free(ptr->name);
+                tmp = ptr;
                 ptr = ptr->next;
+
+                free(tmp->name);
+                free(tmp);
             }
 
             free(pkg->del_list);
@@ -873,8 +877,8 @@ int process_file(char *fpath)
 
     char* cptr = name_split(fpath);
     if (cptr == NULL) {
-        printf ("Unrecognized file: %s , will keep this package.\n",
-                fpath);
+        PRINT_VERBOSE("Unrecognized file: %s , will keep this package.\n",
+                      fpath);
         return 0;
     }
 
@@ -892,7 +896,7 @@ int process_file(char *fpath)
             return -1;
         }
         pkg->fullPath = fpath;
-        pkg->version = TIME_TO_LONG(sb.st_mtimespec);
+        pkg->version = GET_TIME(&sb);
         pkg->size = sb.st_size;
         PDEBUG("pkg: %p, del_list: %p\n", pkg, pkg->del_list);
         return InsertEntry(SourceTable, bname, (void*)pkg);
@@ -930,7 +934,7 @@ int process_file(char *fpath)
     // } while (0);
     SEEK_LIST_TAIL(pkg->del_list, ptr, NameList); // Seek to tail of list.
 
-    if (pkg->version < TIME_TO_LONG(sb.st_mtimespec)) // Target is newer.
+    if (pkg->version < GET_TIME(&sb)) // Target is newer.
     {
         ptr->name      = pkg->fullPath;
         freed_size    += pkg->size;
@@ -1077,7 +1081,7 @@ int cleanup_localdist_resources(object obj)
                 goto out;
             }
             ret = real_delete(0);
-            printf ("Going to deleted %d files,  %dM diskspace will be freed.\n",
+            printf ("\nGoing to deleted %d files,  %dM diskspace will be freed.\n",
                     deleted,  freed_size/1024/1024);
             printf ("Keep going? [Y]\n");
             c = fgetc(stdin);

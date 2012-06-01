@@ -15,9 +15,9 @@ static char name_tmp[256];
 
 /* All samba packages will be left. */
 const char *reserved[] = {
-    "samba",
-    "linux",
-    "firefox",
+    // "samba",
+    "/linux-",
+    // "/firefox",
     NULL
 };
 
