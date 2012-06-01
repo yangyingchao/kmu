@@ -84,8 +84,13 @@ static const char * obj_desc[] = {
 static int verbose = 0;
 
 #define PRINT_VERBOSE(format, args...)                            \
-    if (verbose)\
-    printf(format, ##args);
+    do                                                            \
+    {                                                             \
+        if (verbose)                                              \
+        {                                                         \
+            printf(format, ##args);                               \
+        }                                                         \
+    } while (0)
 
 #define  HASH_SIZE       4096
 
@@ -394,7 +399,7 @@ int read_content(const char *path)
         PDEBUG ("item: %s\n", item);
 
         if (should_skip(item)) {
-            printf("Skip item: %s\n", item);
+            PRINT_VERBOSE("Skip item: %s\n", item);
             goto next;
         }
 
@@ -647,7 +652,7 @@ int add_obj(object obj, const char *input_str)
         break;
     }
 dump_add:
-    printf ("Added item: %s\n", p->str);
+    printf ("Item added: %s\n", p->str);
     return  dump2file(path);
 }
 
