@@ -27,9 +27,34 @@
 #include <unistd.h>
 #include <errno.h>
 #include <sys/stat.h>
-#include <ftw.h>
+#include <dirent.h>
 #include <libgen.h>
+#include <ftw.h>
 #include "util.h"
+
+#define handle_error(msg) \
+    do { perror(msg); exit(EXIT_FAILURE); } while (0)
+
+#ifdef __APPLE__
+#define TIME_TO_LONG(X) X.tv_sec
+#else
+#define TIME_TO_LONG(X) X
+#endif
+
+// Hash Tables.
+typedef struct _TableEntry
+{
+    char* key;
+    char* fullPath;
+    long  version;
+    long  size;
+} TableEntry;
+
+typedef struct _HashTable
+{
+    int         capacity;
+    TableEntry* entries;
+} HashTable;
 
 /* Options will be parsed */
 static struct option long_options[] = {
@@ -78,6 +103,128 @@ static int verbose = 0;
     if (verbose)\
     printf(format, ##args);
 
+#define HASH_SIZE       4096
+
+typedef unsigned int   uint32;
+
+
+uint32 StringHashFunction(const char* str)
+{
+    uint32 hash = 0;
+    uint32 i    = 0;
+    const char*  key  = str;
+
+    for (; i < strlen(str); ++i)
+    {
+        hash += *(key + i);
+        hash += (hash << 10);
+        hash ^= (hash >> 6);
+    }
+
+    hash += (hash << 3);
+    hash ^= (hash >> 11);
+    hash += (hash << 15);
+
+    return hash % HASH_SIZE;
+}
+
+void HashTableDestroy(HashTable* table)
+{
+    if (table)
+    {
+        if (table->entries)
+        {
+            int i = 0;
+            for (; i < table->capacity; ++i)
+            {
+                TableEntry* entry = &table->entries[i];
+                if (entry->key)
+                {
+                    free(entry->key);
+                }
+                if (entry->fullPath)
+                {
+                    free(entry->fullPath);
+                }
+            }
+            free(table->entries);
+        }
+        free(table);
+    }
+}
+
+HashTable* HashTableCreate()
+{
+    HashTable* table = malloc(sizeof(HashTable));
+    if (table)
+    {
+        memset(table, 0, sizeof(HashTable));
+        table->capacity = HASH_SIZE;
+        table->entries = malloc(sizeof(TableEntry) * HASH_SIZE);
+        if (table->entries)
+        {
+            memset(table->entries, 0, sizeof(TableEntry) * HASH_SIZE);
+        }
+        else
+        {
+            HashTableDestroy(table);
+            table = NULL;
+        }
+    }
+    return table;
+}
+
+int InsertEntry(HashTable* table, char* key, char* fullPath, long version, long size)
+{
+    int ret = 0;
+    if (!table || !key || !fullPath )
+    {
+        return ret;
+    }
+
+    uint32 index = StringHashFunction(key);
+    // Insert entry into the first open slot starting from index.
+    uint32 i;
+    for (i = index; i < HASH_SIZE; ++i)
+    {
+        TableEntry* entry = &table->entries[i];
+        if (entry->key == NULL)
+        {
+            ret = 1;
+            entry->key      = key;
+            entry->fullPath = fullPath;
+            entry->version  = version;
+            entry->size     = size;
+            break;
+        }
+    }
+    return ret;
+}
+
+TableEntry* GetEntryFromHashTable(HashTable* table, char* key)
+{
+    TableEntry* entry = NULL;
+    uint32 index = StringHashFunction(key);
+    int i;
+    for (i = index; i < HASH_SIZE; ++i)
+    {
+        entry = &table->entries[i];
+        if (entry->key == NULL)
+        {
+            return NULL;
+        }
+        if (strcmp(entry->key, key) == 0)
+        {
+            break;
+        }
+    }
+    return entry;
+}
+
+
+static HashTable* SourceTable = NULL;
+
+
 /**
  * Get corresponding path based on type of action.
  *
@@ -86,7 +233,7 @@ static int verbose = 0;
  * @return
  */
 
-char * get_path(object obj)
+char* get_path(object obj)
 {
     int idx = 0;
     int N   =  sizeof(path_base)/sizeof(type2path);
@@ -124,6 +271,7 @@ void usage(char **argv)
     printf ("-a, --add: 	Add an object.\n");
     printf ("-d, --delete: 	Delete an object.\n");
     printf ("-l, --list: 	List an object.\n");
+    printf ("-c, --clean: 	Clean local resources.\n\n");
     printf ("-h, --help: 	Print this message.\n\n");
     printf("****** Examples: ******\n");
     printf("List all keywords stored in /etc/portage/package.keyword:\n"
@@ -768,74 +916,76 @@ int del_obj(object obj, const char *input_str)
  * used to record files that are going to be deleted.
  * Return: int
  */
-int process_file(const char *fpath, const struct stat *sb, int typeflag)
+int process_file(char *fpath)
 {
-    char *ptr, *bname;
+    char *cptr, *bname;
     name_version     *p   = NULL;
     struct list_head *pptr = NULL;
     int found = 0, ret = 0;
     char *to_delete = NULL;
     char *to_keep = NULL;
 
-    // @todo: do not scan subdirectories.
-
-    if (typeflag == FTW_F) {
-        /*
-         * Skip reserved files, Reason:
-         *		1. They are kept for special reason (samba)
-         *		2. They don't take up much disk size.
-         */
-        if (should_reserve(fpath)) {
-            PRINT_VERBOSE ("Reserved file: %s\n", fpath);
-            return 0;
-        }
-
-        ptr = name_split(fpath);
-        if (ptr == NULL){
-            PRINT_DEBUG ("Unrecognized file: %s , will keep this package.",
-                         fpath);
-            return 0;
-        }
-
-        bname = basename(strdup(ptr));
-        to_keep = strdup(fpath);
-        name_version *ptr = source_list->next;
-        while (ptr) {
-            if (strcmp(name_split(basename(strdup(ptr->name))),
-                       bname) == 0) {
-                found = 1;
-                deleted ++;
-                if (ptr->version < sb->st_mtime) {
-                    to_delete = strdup(ptr->name);
-                    /* Update statistics */
-                    freed_size += ptr->size;
-                    /* Update source info. */
-                    ptr->name = strdup(fpath);
-                    ptr->version = sb->st_mtime;
-                }
-                else {
-                    to_delete = strdup(fpath);
-                    to_keep = strdup(ptr->name);
-                    freed_size += sb->st_size;
-                }
-                break;
-            }
-            ptr = ptr->next;
-        }
-
-        ptr = calloc(sizeof(name_version), 1);
-        if (found == 0) { /* Add file into source_list. */
-            ptr->name    = strdup(to_keep);
-            ptr->version = sb->st_mtime;
-            ptr->size    = sb->st_size;
-            list_add((str_list *)source_list, ptr);
-        }
-        else {  /* Add file into del_list if found was set. */
-            ptr->name    = strdup(to_delete);
-            ptr->to_keep = strdup(to_keep);
-            list_add((str_list *)del_list, ptr);
-        }
+    if (!fpath || (access(fpath, F_OK) == -1))
+    {
+        handle_error("File error\n");
     }
+    struct stat sb;
+    ret = stat(fpath, &sb);
+    if (ret == -1)
+    {
+        printf("Failed to get file status: %s\n", fpath);
+        return -1;
+    }
+
+    /*
+     * Skip reserved files, Reason:
+     *		1. They are kept for special reason (samba)
+     *		2. They don't take up much disk size.
+     */
+    if (should_reserve(fpath)) {
+        printf("Reserved file: %s\n", fpath);
+        return 0;
+    }
+
+    cptr = name_split(fpath);
+    if (cptr == NULL) {
+        printf ("Unrecognized file: %s , will keep this package.\n",
+                fpath);
+        return 0;
+    }
+
+    bname = strdup(basename(strdup(cptr)));
+    TableEntry* entry = GetEntryFromHashTable(SourceTable, bname);
+    if (!entry)
+    {
+        return InsertEntry(SourceTable, bname, fpath, TIME_TO_LONG(sb.st_mtimespec), sb.st_size);
+    }
+    else
+    {
+        char* toDelete = NULL;
+
+        if (entry->version < TIME_TO_LONG(sb.st_mtimespec)) // Target is newer.
+        {
+            printf ("A");
+            toDelete         = entry->fullPath;
+            freed_size      += entry->size; 
+            entry->fullPath  = fpath;
+            entry->size      = sb.st_size;
+        }
+        else
+        {
+            printf ("B");
+            toDelete    = fpath;
+            freed_size += sb.st_size;
+        }
+
+        name_version *ptr = calloc(sizeof(name_version), 1);
+        ptr->name    = strdup(toDelete);
+        ptr->to_keep = strdup(entry->fullPath);
+        list_add((str_list *)del_list, ptr);
+        deleted ++;
+    }
+
     return 0;
 }
 
@@ -882,9 +1032,22 @@ int cleanup_localdist_resources(object obj)
     char c;
     PDEBUG ("enter\n");
 
-    if (obj == UNKNOWN) {
+    if (obj == UNKNOWN)
+    {
         printf("Cleaning up distfiles.\n");
-        if (source_list == NULL) {
+
+        if (SourceTable == NULL)
+        {
+            SourceTable = HashTableCreate();
+            if (!SourceTable)
+            {
+                printf("Failed to create source table!\n");
+                return -1;
+            }
+        }
+
+        if (source_list == NULL)
+        {
             source_list = malloc(sizeof(name_version));
             memset(source_list, 0, sizeof(name_version));
         }
@@ -893,26 +1056,55 @@ int cleanup_localdist_resources(object obj)
         INIT_LIST(del_list, name_version);
 
         printf ("Scanning local resources...\n");
-        ret = ftw(dist_path, process_file, 0);
-        if (deleted == 0) {
-            printf ("No outdated file found!\n");
-            goto out;
-        }
-        ret = real_delete(0);
-        printf ("Going to deleted %d files,  %dM diskspace will be freed.\n",
-                deleted,  freed_size/1024/1024);
-        printf ("Keep going? [Y]\n");
-        c = fgetc(stdin);
-        if (c == 'N' || c == 'n')
-            printf ("Files are not deleted.\n");
-        else{
-            ret = real_delete(1);
-            if (ret) {
-                fprintf(stderr, "ERROR: Failed to execute delete command!\n");
+        DIR* dir = opendir(dist_path);
+        if (dir)
+        {
+            struct dirent* entry;
+            while ((entry = readdir(dir)) != NULL)
+            {
+                if (entry->d_type & DT_DIR)
+                {
+                    continue;
+                }
+                char* name = entry->d_name;
+                if (name)
+                {
+                    int length = strlen(dist_path) + strlen(name) + 2;
+                    char* fullname = malloc(length);
+                    if (!fullname)
+                    {
+                        handle_error("Failed to malloc");
+                    }
+                    sprintf(fullname, "%s/%s", dist_path, name);
+                    process_file(fullname);
+                }
+            }
+            if (deleted == 0) {
+                printf ("No outdated file found!\n");
+                goto out;
+            }
+            ret = real_delete(0);
+            printf ("Going to deleted %d files,  %dM diskspace will be freed.\n",
+                    deleted,  freed_size/1024/1024);
+            printf ("Keep going? [Y]\n");
+            c = fgetc(stdin);
+            if (c == 'N' || c == 'n')
+                printf ("Files are not deleted.\n");
+            else{
+                ret = real_delete(1);
+                if (ret) {
+                    fprintf(stderr, "ERROR: Failed to execute delete command!\n");
+                }
             }
         }
+        else
+        {
+            printf("Failed to open directory: %s\n", dist_path);
+            ret = -1;
+        }
     }
-    else {
+    else
+    {
         char *path = get_path(obj);
         if (path == NULL) {
             fprintf(stderr, "ERROR: Failed to convert type to path\n");
