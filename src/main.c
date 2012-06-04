@@ -557,15 +557,12 @@ int merge_use(str_list *p, const char *new)
  */
 int add_obj(ActObject obj, const char *input_str)
 {
-    char *path;
-    str_list *p = NULL;
-    int  i = 0;
-
     if (input_str == NULL || strlen(input_str) == 0) {
         fprintf(stderr, "ERROR: You should provide a entry to add.\n");
         return -1;
     }
 
+    char *path;
     printf("Adding new Item to %s.\n", obj_desc[obj]);
     path = GetPathFromType(obj);
     if (path == NULL){
@@ -577,9 +574,7 @@ int add_obj(ActObject obj, const char *input_str)
                 path);
         return -1;
     }
-
-    free(path);
-
+    str_list *p = NULL;
     switch (obj) {
         case AO_USE: { /* USEs may need to be merged. */
             char **margv = strsplit(input_str);
@@ -624,7 +619,9 @@ int add_obj(ActObject obj, const char *input_str)
     }
 dump_add:
     printf ("Item added: %s\n", p->str);
-    return  dump2file(path);
+    int ret = dump2file(path);
+    free(path);
+    return  path;
 }
 
 /**
