@@ -235,7 +235,6 @@ char **list_to_array()
 int dump2file(const char *path)
 {
     int ret = 0, writen, fd = 0;
-    struct list_head *ptr = NULL;
 
     if (path == NULL) {
         fprintf(stderr, "ERROR: Empty path! \n");
@@ -355,7 +354,6 @@ int read_content(const char *path)
     ssize_t read;
     str_list *p = NULL;
     char * item = NULL;
-    char *tmp = NULL;
 
     if (access(path, F_OK)) {
         printf ("Orignal file doest not exist!\n");
@@ -621,7 +619,7 @@ dump_add:
     printf ("Item added: %s\n", p->str);
     int ret = dump2file(path);
     free(path);
-    return  path;
+    return ret;
 }
 
 /**
@@ -876,7 +874,6 @@ int process_file(char *fpath)
     }
 
     // Old package found, compare version.
-    char*     toDelete = NULL;
     PkgInfo*  pkg      = (PkgInfo*)val;
 
     // Create del_list for pkg, this is not initialized when creating PkgInfo, because not

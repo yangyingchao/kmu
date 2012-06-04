@@ -1,9 +1,9 @@
 ;; Object kmu
-;; EDE project file.
+;; EDE Project Files are auto generated: Do Not Edit
 (ede-proj-project "kmu"
-  :name "kmu"
   :file "Project.ede"
-  :targets (list
+  :name "kmu"
+  :targets (list 
    (ede-proj-target-makefile-program "kmu"
     :name "kmu"
     :path ""
@@ -13,5 +13,6 @@
    )
   :configuration-default "release"
   :makefile-type 'Makefile.am
+  :variables '(("AM_CFLAGS" . "-Wall"))
   :configuration-variables '(("debug" ("AM_CFLAGS" . "-DDEBUG")))
   )
