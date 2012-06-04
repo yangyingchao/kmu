@@ -17,6 +17,7 @@ static char name_tmp[256];
 const char *reserved[] = {
     // "samba",
     "/linux-",
+    "patches",
     // "/firefox",
     NULL
 };

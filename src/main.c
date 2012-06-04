@@ -834,7 +834,7 @@ int process_file(char *fpath)
      *		2. They don't take up much disk size.
      */
     if (should_reserve(fpath)) {
-        printf("Reserved file: %s\n", fpath);
+        PRINT_VERBOSE("Reserved file: %s\n", fpath);
         return 0;
     }
 
