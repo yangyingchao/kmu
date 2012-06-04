@@ -5,14 +5,50 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <stdbool.h>
 
 #define True  1
 #define False 0
 #define source_base       "/usr/portage/distfile/"
 
+
 #define oops(ch, args...)\
     {fprintf(stderr,ch,##args);perror("Reason from system call: ");return -1;}
 
+
+#define INIT_LIST(instance, type) do {                                  \
+        if (instance == NULL) {                                         \
+            instance = (type *)malloc(sizeof(type));                    \
+            if (instance == NULL) {                                     \
+                fprintf(stderr, "ERROR: failed to alloc memory.\n");    \
+                return -1;                                              \
+            }                                                           \
+            memset(instance, 0, sizeof(type));                          \
+        }                                                               \
+    } while (0);
+
+// Seek to list tail and create new empty.
+#define SEEK_LIST_TAIL(lst, ptr, type)                      \
+    do                                                      \
+    {                                                       \
+        ptr = lst;                                          \
+        while (ptr)                                         \
+        {                                                   \
+            if (ptr->next == NULL)                          \
+            {                                               \
+                ptr->next = (type*) malloc(sizeof(type));   \
+                memset(ptr->next, 0, sizeof(type));         \
+                break;                                      \
+            }                                               \
+            else                                            \
+            {                                               \
+                ptr = ptr->next;                            \
+            }                                               \
+        }                                                   \
+    } while (0)                                             \
+
+#define handle_error(msg)                               \
+    do { perror(msg); exit(EXIT_FAILURE); } while (0)
 
 // #define DEBUG       1
 
@@ -32,21 +68,32 @@
 #define PRINT_DEBUG(format, args...)
 #endif
 
+#define PRINT_VERBOSE(format, args...)          \
+        do                                      \
+        {                                       \
+            if (verbose)                        \
+            {                                   \
+                printf(format, ##args);         \
+            }                                   \
+        } while (0)
+
+
+
 typedef unsigned int   uint32;
 
 extern const char *dist_path;
 /* Action types */
-typedef enum _act_type{
-    UNKNOWN = 0,
-    ADD,
-    DELETE,
-    LIST,
-    CLEANUP,
-} act_type;
+typedef enum _ActType{
+    AT_UNKNOWN = 0,
+    AT_ADD,
+    AT_DELETE,
+    AT_LIST,
+    AT_CLEANUP,
+} ActType;
 
 /* Object types */
 typedef enum _object{
-    UNKNOWN_OBJ = 0,
+    UNKNOWN = 0,
     KEYWORD,
     MASK,
     USE,
@@ -100,12 +147,21 @@ typedef struct _HashTable
     DestroyFunction deFunctor;
 } HashTable;
 
+typedef struct _KmuOpt
+{
+    bool     verbose;
+    ActType act;
+    object   obj;
+} KmuOpt;
+
+
+
+// Functions.
 void HashTableDestroy(HashTable* table);
 HashTable* HashTableCreate(uint32 size, HashFunction cFunctor, DestroyFunction dFunctor);
 int InsertEntry(HashTable* table, char* key, void* val);
 void* GetEntryFromHashTable(HashTable* table, char* key);
 
-// Functions.
 char **strsplit(const char *str);
 int should_reserve(const char *key);
 char *name_split(const char *fullname);
@@ -115,36 +171,8 @@ void list_add(str_list *root, void *new);
 
 int dir_exist(const char *path);
 int file_exist(const char *path);
-#define INIT_LIST(instance, type) do {                                  \
-        if (instance == NULL) {                                         \
-            instance = (type *)malloc(sizeof(type));                    \
-            if (instance == NULL) {                                     \
-                fprintf(stderr, "ERROR: failed to alloc memory.\n");    \
-                return -1;                                              \
-            }                                                           \
-            memset(instance, 0, sizeof(type));                          \
-        }                                                               \
-    } while (0);
+int cmpstringgp(const void *p1, const void *p2);
 
-// Seek to list tail and create new empty.
-#define SEEK_LIST_TAIL(lst, ptr, type)                      \
-    do                                                      \
-    {                                                       \
-        ptr = lst;                                          \
-        while (ptr)                                         \
-        {                                                   \
-            if (ptr->next == NULL)                          \
-            {                                               \
-                ptr->next = (type*) malloc(sizeof(type));   \
-                memset(ptr->next, 0, sizeof(type));         \
-                break;                                      \
-            }                                               \
-            else                                            \
-            {                                               \
-                ptr = ptr->next;                            \
-            }                                               \
-        }                                                   \
-    } while (0)                                             \
 
 #endif /* _UTIL_H_ */
 /*

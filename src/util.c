@@ -297,3 +297,25 @@ void* GetEntryFromHashTable(HashTable* table, char* key)
     }
     return entry->val;
 }
+
+/**
+ * Compare two input strings to sort.
+ *
+ * @param p1,p2 - Strings to be compared.
+ *
+ * @return: int
+ */
+int cmpstringgp(const void *p1, const void *p2)
+{
+    char *pp1 = *(char * const *)p1;
+    char *pp2 = *(char * const *)p2;
+
+    while ( *pp1 == '<' || *pp1 == '=' || *pp1 == '>') {
+        pp1 ++;
+    }
+    while ( *pp2 == '<' || *pp2 == '=' || *pp2 == '>') {
+        pp2 ++;
+    }
+
+    return strcmp(pp1, pp2);
+}

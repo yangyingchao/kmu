@@ -32,9 +32,6 @@
 #include <ftw.h>
 #include "util.h"
 
-#define handle_error(msg) \
-    do { perror(msg); exit(EXIT_FAILURE); } while (0)
-
 #ifdef __APPLE__
 #define GET_TIME(X) (X)->st_mtimespec.tv_sec
 #else
@@ -59,12 +56,6 @@ static struct option long_options[] = {
     {0, 0, 0, 0}
 };
 
-static int  freed_size = 0;
-static int  deleted    = 0;
-
-PkgInfo *source_list;
-str_list *content_list = NULL;
-
 static const type2path path_base[] = {
     { KEYWORD, 	"/etc/portage/package.keywords/keywords"},
     { MASK, 	"/etc/portage/package.mask/mask"},
@@ -81,18 +72,16 @@ static const char * obj_desc[] = {
     "Unmask"
 };
 
-static int verbose = 0;
+PkgInfo           *source_list;
 
-#define PRINT_VERBOSE(format, args...)                            \
-    do                                                            \
-    {                                                             \
-        if (verbose)                                              \
-        {                                                         \
-            printf(format, ##args);                               \
-        }                                                         \
-    } while (0)
+static HashTable*  SourceTable  = NULL;
+static KmuOpt      opts;
+static const int   HASH_SIZE    = 4096;
+static int         deleted      = 0;
+static int         freed_size   = 0;
+static int         verbose      = 0;
+str_list          *content_list = NULL;
 
-#define  HASH_SIZE       4096
 
 uint32 StringHashFunction(const char* str)
 {
@@ -114,7 +103,6 @@ uint32 StringHashFunction(const char* str)
     return hash % HASH_SIZE;
 }
 
-static HashTable* SourceTable = NULL;
 
 
 /**
@@ -174,27 +162,6 @@ void usage(char **argv)
            "\t kmu -du xxx\n");
 }
 
-/**
- * Compare two input strings to sort.
- *
- * @param p1,p2 - Strings to be compared.
- *
- * @return: int
- */
-int cmpstringgp(const void *p1, const void *p2)
-{
-    char *pp1 = *(char * const *)p1;
-    char *pp2 = *(char * const *)p2;
-
-    while ( *pp1 == '<' || *pp1 == '=' || *pp1 == '>') {
-        pp1 ++;
-    }
-    while ( *pp2 == '<' || *pp2 == '=' || *pp2 == '>') {
-        pp2 ++;
-    }
-
-    return strcmp(pp1, pp2);
-}
 
 
 /**
@@ -1148,7 +1115,7 @@ int cleanup_localdist_resources(object obj)
 int main(int argc, char **argv)
 {
     int c;
-    act_type type = UNKNOWN;
+    ActType type = UNKNOWN;
     object obj = UNKNOWN;
     int ret=0;
     char items[1024];
@@ -1196,7 +1163,7 @@ int main(int argc, char **argv)
                 printf ("Confilict actions!\n");
                 err_flag = 1;
             }
-            type = ADD;
+            type = AT_ADD;
             break;
         }
         case 'c': {
@@ -1204,7 +1171,7 @@ int main(int argc, char **argv)
                 printf ("Confilict actions!\n");
                 err_flag = 1;
             }
-            type = CLEANUP;
+            type = AT_CLEANUP;
             break;
         }
         case 'u': {
@@ -1217,7 +1184,7 @@ int main(int argc, char **argv)
         }
 
         case 'U': {
-            if (obj != UNKNOWN) {
+            if (obj != AT_UNKNOWN) {
                 printf ("Confilict objects!\n");
                 err_flag = 1;
             }
@@ -1246,7 +1213,7 @@ int main(int argc, char **argv)
                 printf ("Confilict actions!\n");
                 err_flag = 1;
             }
-            type = DELETE;
+            type = AT_DELETE;
             break;
         }
         case 'l': {
@@ -1254,7 +1221,7 @@ int main(int argc, char **argv)
                 printf ("Confilict actions!\n");
                 err_flag = 1;
             }
-            type = LIST;
+            type = AT_LIST;
             break;
         }
         case 'v': {
@@ -1283,20 +1250,20 @@ int main(int argc, char **argv)
     }
 
     switch (type) {
-    case ADD: {
+    case AT_ADD: {
         ret = add_obj(obj, items);
         break;
     }
 
-    case DELETE: {
+    case AT_DELETE: {
         ret = del_obj(obj, items);
         break;
     }
-    case LIST: {
+    case AT_LIST: {
         ret = list_obj(obj, items);
         break;
     }
-    case CLEANUP:{
+    case AT_CLEANUP:{
         ret = cleanup_localdist_resources(obj);
         break;
     }
