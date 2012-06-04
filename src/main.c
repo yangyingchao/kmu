@@ -76,7 +76,6 @@ static const char * obj_desc[] = {
 PkgInfo           *source_list;
 
 static HashTable*  SourceTable  = NULL;
-static KmuOpt      opts;
 static const int   HASH_SIZE    = 4096;
 static int         deleted      = 0;
 static int         freed_size   = 0;
@@ -114,25 +113,28 @@ uint32 StringHashFunction(const char* str)
  * @return
  */
 
-char* get_path(ActObject obj)
+char* GetPathFromType(ActObject obj)
 {
-    int idx = 0;
-    int N   =  sizeof(path_base)/sizeof(type2path);
-    char* prefix = NULL;
-    prefix = getenv("EPREFIX");
+    int   idx    = 0;
+    int   N      = sizeof(path_base)/sizeof(type2path);
+    char* prefix = getenv("EPREFIX"); // Used by gentoo prefix(MacOsX).
+    char* path = NULL;
     for (idx = 0; idx < N; idx++) {
         if (path_base[idx].obj == obj) {
             if (prefix)
             {
-                return strcat(prefix, path_base[idx].path);
+                unsigned int size = strlen(prefix) + strlen(path_base[idx].path) + 1;
+                path = (char*)malloc(size);
+                memset(path, 0, size);
+                sprintf(path, "%s/%s", prefix, path_base[idx].path);
             }
             else
             {
-                return path_base[idx].path;
+                path = strdup(path_base[idx].path);
             }
         }
     }
-    return NULL;
+    return path;
 }
 
 /**
@@ -565,7 +567,7 @@ int add_obj(ActObject obj, const char *input_str)
     }
 
     printf("Adding new Item to %s.\n", obj_desc[obj]);
-    path = get_path(obj);
+    path = GetPathFromType(obj);
     if (path == NULL){
         oops("Failed to get path according to ActObject!\n");
     }
@@ -576,6 +578,7 @@ int add_obj(ActObject obj, const char *input_str)
         return -1;
     }
 
+    free(path);
 
     switch (obj) {
         case AO_USE: { /* USEs may need to be merged. */
@@ -638,7 +641,7 @@ int list_obj(ActObject obj, const char *key)
     str_list *ptr;
     printf("List entry in %s.\n", obj_desc[obj]);
 
-    path = get_path(obj);
+    path = GetPathFromType(obj);
     if (path == NULL){
         fprintf(stderr, "ERROR: Failed to get path according to ActObject!\n");
         return -1;
@@ -696,7 +699,7 @@ int list_obj(ActObject obj, const char *key)
 int del_obj(ActObject obj, const char *input_str)
 {
     int counter = 0, i = 0, ret = 0;
-    char * path = get_path(obj);
+    char * path = GetPathFromType(obj);
     char c;
 
     if (input_str == NULL || strlen(input_str) == 0) {
@@ -1083,7 +1086,7 @@ int cleanup_localdist_resources(ActObject obj)
     }
     else
     {
-        char *path = get_path(obj);
+        char *path = GetPathFromType(obj);
         if (path == NULL)
         {
             fprintf(stderr, "ERROR: Failed to convert type to path\n");
@@ -1109,6 +1112,7 @@ KmuOpt* ParseOptions(int argc, char **argv)
     KmuOpt* opts = (KmuOpt*)malloc(sizeof(KmuOpt));
     if (opts)
     {
+        memset(opts, 0, sizeof(KmuOpt));
         int  c;
         int err_flag = 0;
         /* Parse options from command line, store them into TYPE and OBJ */
@@ -1122,7 +1126,6 @@ KmuOpt* ParseOptions(int argc, char **argv)
             /* Detect the end of the options. */
             if (c == -1)
                 break;
-
             switch (c) {
                 case 0: {
                     /* If this option set a flag, do nothing else now. */
@@ -1143,7 +1146,7 @@ KmuOpt* ParseOptions(int argc, char **argv)
                         printf ("Confilict actions!\n");
                         err_flag = 1;
                     }
-                    opts->act = AT_UNKNOWN;
+                    opts->act = AT_ADD;
                     break;
                 }
                 case 'c': {
@@ -1205,6 +1208,7 @@ KmuOpt* ParseOptions(int argc, char **argv)
                     break;
                 }
                 case 'v': {
+                    opts->verbose = true;
                     verbose = 1;
                     break;
                 }
@@ -1234,7 +1238,14 @@ KmuOpt* ParseOptions(int argc, char **argv)
             }
         }
     }
-    PDEBUG ("opts: %p\n", opts);
+
+#ifdef DEBUG
+    if (opts)
+    {
+        printf ("opts: %p, act: %d, obj: %d, args: %s\n",
+                opts, opts->act, opts->obj, opts->args);
+    }
+#endif
     return opts;
 }
 
@@ -1253,17 +1264,18 @@ int main(int argc, char **argv)
     int  ret = 0;
 
     if (geteuid() != 0) {
-            fprintf(stderr, "Should be executed as root, do not complain if you are not!\n");
+        fprintf(stderr, "Should be executed as root, do not complain if you are not!\n");
     }
 
     INIT_LIST(content_list, str_list);
 
     KmuOpt* opts = ParseOptions(argc, argv);
-    if (!opts)
-    {
+    if (!opts) {
         usage(argv);
         exit(1);
     }
+
+    PDEBUG ("%d\n", opts->act);
 
     switch (opts->act) {
     case AT_ADD: {
