@@ -56,16 +56,17 @@ static struct option long_options[] = {
     {0, 0, 0, 0}
 };
 
-static const type2path path_base[] = {
-    { KEYWORD, 	"/etc/portage/package.keywords/keywords"},
-    { MASK, 	"/etc/portage/package.mask/mask"},
-    { USE, 		"/etc/portage/package.use/use" },
-    { UMASK,    "/etc/portage/package.unmask/unmask"},
-    { 0, 		NULL},
+static const type2path path_base[] =
+{
+    { AO_KEYWORD,       "/etc/portage/package.keywords/keywords"},
+    { AO_MASK,          "/etc/portage/package.mask/mask"},
+    { AO_USE,           "/etc/portage/package.use/use" },
+    { AO_UMASK,         "/etc/portage/package.unmask/unmask"},
+    { 0,                NULL},
 };
 
 static const char * obj_desc[] = {
-    "Ubknown object",
+    "Ubknown ActObject",
     "Keyword",
     "Mask",
     "USE",
@@ -113,7 +114,7 @@ uint32 StringHashFunction(const char* str)
  * @return
  */
 
-char* get_path(object obj)
+char* get_path(ActObject obj)
 {
     int idx = 0;
     int N   =  sizeof(path_base)/sizeof(type2path);
@@ -148,9 +149,9 @@ void usage(char **argv)
     printf ("-u, --use: 	Modify or add new use to package_string\n");
     printf ("-U, --Umask: 	Unmask a package\n\n");
     printf ("****** Operations: ********\n");
-    printf ("-a, --add: 	Add an object.\n");
-    printf ("-d, --delete: 	Delete an object.\n");
-    printf ("-l, --list: 	List an object.\n");
+    printf ("-a, --add: 	Add an ActObject.\n");
+    printf ("-d, --delete: 	Delete an ActObject.\n");
+    printf ("-l, --list: 	List an ActObject.\n");
     printf ("-c, --clean: 	Clean local resources.\n");
     printf ("-h, --help: 	Print this message.\n\n");
     printf("****** Examples: ******\n");
@@ -545,14 +546,14 @@ int merge_use(str_list *p, const char *new)
 }
 
 /**
- * Add or merge a string into object.
+ * Add or merge a string into ActObject.
  *
  * @param obj
  * @param input_str
  *
  * @return
  */
-int add_obj(object obj, const char *input_str)
+int add_obj(ActObject obj, const char *input_str)
 {
     char *path;
     str_list *p = NULL;
@@ -566,7 +567,7 @@ int add_obj(object obj, const char *input_str)
     printf("Adding new Item to %s.\n", obj_desc[obj]);
     path = get_path(obj);
     if (path == NULL){
-        oops("Failed to get path according to object!\n");
+        oops("Failed to get path according to ActObject!\n");
     }
 
     if (read_content(path) == -1) {
@@ -577,46 +578,46 @@ int add_obj(object obj, const char *input_str)
 
 
     switch (obj) {
-    case USE: { /* USEs may need to be merged. */
-        char **margv = strsplit(input_str);
-        p = key_exist(margv[0]);
-        free_array(margv);
-        if (p != NULL) { /* Merge USE */
-            char c;
-            printf("Item %s is already in the destination!\n"
-                   "Orignal content: %s\n", margv[0],  p->str);
-            printf ("Would you like to merge it ?\n");
-            c = fgetc(stdin);
-            if ((c == 'Y') || (c == 'y')) {
-                if (merge_use(p, input_str) != 0) {
-                    fprintf(stderr, "ERROR: Failed to merge use "
-                            "please update it manually!\n");
-                    return -1;
-                }
-                PDEBUG ("After merged: %s\n", p->str);
+        case AO_USE: { /* USEs may need to be merged. */
+            char **margv = strsplit(input_str);
+            p = key_exist(margv[0]);
+            free_array(margv);
+            if (p != NULL) { /* Merge USE */
+                char c;
+                printf("Item %s is already in the destination!\n"
+                       "Orignal content: %s\n", margv[0],  p->str);
+                printf ("Would you like to merge it ?\n");
+                c = fgetc(stdin);
+                if ((c == 'Y') || (c == 'y')) {
+                    if (merge_use(p, input_str) != 0) {
+                        fprintf(stderr, "ERROR: Failed to merge use "
+                                "please update it manually!\n");
+                        return -1;
+                    }
+                    PDEBUG ("After merged: %s\n", p->str);
 
-                goto dump_add;
-            }
-            else {
-                printf ("New item was not added to database.\n");
-                return 0;
+                    goto dump_add;
+                }
+                else {
+                    printf ("New item was not added to database.\n");
+                    return 0;
+                }
             }
         }
-    }
 
-    /* Fall through */
-    case KEYWORD:
-    case MASK:
-    case UMASK: { /* These objects does not need merge, just add new ones. */
-        p = (str_list *) malloc(sizeof(str_list));
-        memset(p, 0, sizeof(str_list));
-        p->str = strdup(input_str);
-        list_add(content_list, p);
-        content_list->un.counter ++;
-        break;
-    }
-    default:
-        break;
+            /* Fall through */
+        case AO_KEYWORD:
+        case AO_MASK:
+        case AO_UMASK: { /* These ActObjects does not need merge, just add new ones. */
+            p = (str_list *) malloc(sizeof(str_list));
+            memset(p, 0, sizeof(str_list));
+            p->str = strdup(input_str);
+            list_add(content_list, p);
+            content_list->un.counter ++;
+            break;
+        }
+        default:
+            break;
     }
 dump_add:
     printf ("Item added: %s\n", p->str);
@@ -624,14 +625,14 @@ dump_add:
 }
 
 /**
- * list_obj - List all items in this object.
- * @obj -  object
+ * list_obj - List all items in this ActObject.
+ * @obj -  ActObject
  * @key - Character key, a string of items interested in.
  *
  * Return: int
  * NOTE: Multiple items may be listed in one command.
  */
-int list_obj(object obj, const char *key)
+int list_obj(ActObject obj, const char *key)
 {
     char *path;
     str_list *ptr;
@@ -639,7 +640,7 @@ int list_obj(object obj, const char *key)
 
     path = get_path(obj);
     if (path == NULL){
-        fprintf(stderr, "ERROR: Failed to get path according to object!\n");
+        fprintf(stderr, "ERROR: Failed to get path according to ActObject!\n");
         return -1;
     }
 
@@ -687,12 +688,12 @@ int list_obj(object obj, const char *key)
 /**
  * Delete a record which contains input_str in this Object.
  *
- * @param obj: an object used to identify which file to modify.
+ * @param obj: an ActObject used to identify which file to modify.
  * @param input_str: an input_str to identify which record to be removed.
  *
- * @Note: Multiple objects (separeted by whitespace) can be deleted each time.
+ * @Note: Multiple ActObjects (separeted by whitespace) can be deleted each time.
  */
-int del_obj(object obj, const char *input_str)
+int del_obj(ActObject obj, const char *input_str)
 {
     int counter = 0, i = 0, ret = 0;
     char * path = get_path(obj);
@@ -705,7 +706,7 @@ int del_obj(object obj, const char *input_str)
 
     printf("Deleting entry for: %s.\n", obj_desc[obj]);
     if (path == NULL){
-        printf ("Failed to get path according to object!\n");
+        printf ("Failed to get path according to ActObject!\n");
         return -1;
     }
     printf("File: \t%s\nItem: \t%s\n", path, input_str);
@@ -1006,11 +1007,11 @@ int real_delete(int doit)
  *
  * @return: 0 if succeeded, or non-zero otherwise.
  */
-int cleanup_localdist_resources(object obj)
+int cleanup_localdist_resources(ActObject obj)
 {
     int ret;
     char c;
-    if (obj == UNKNOWN)
+    if (obj == AO_UNKNOWN)
     {
         printf("Cleaning up distfiles.\n");
 
@@ -1103,6 +1104,140 @@ int cleanup_localdist_resources(object obj)
     return ret;
 }
 
+KmuOpt* ParseOptions(int argc, char **argv)
+{
+    KmuOpt* opts = (KmuOpt*)malloc(sizeof(KmuOpt));
+    if (opts)
+    {
+        int  c;
+        int err_flag = 0;
+        /* Parse options from command line, store them into TYPE and OBJ */
+        while (1) {
+            /* getopt_long stores the option index here. */
+            int option_index = 0;
+
+            c = getopt_long (argc, argv, "adumklhcvU",
+                             long_options, &option_index);
+
+            /* Detect the end of the options. */
+            if (c == -1)
+                break;
+
+            switch (c) {
+                case 0: {
+                    /* If this option set a flag, do nothing else now. */
+                    if (long_options[option_index].flag != 0)
+                        break;
+                    printf ("option %s", long_options[option_index].name);
+                    if (optarg)
+                        printf (" with arg %s", optarg);
+                    printf ("\n");
+                    break;
+                }
+                case 'h': {
+                    usage(argv);
+                    break;
+                }
+                case 'a': {
+                    if (opts->act != AT_UNKNOWN) {
+                        printf ("Confilict actions!\n");
+                        err_flag = 1;
+                    }
+                    opts->act = AT_UNKNOWN;
+                    break;
+                }
+                case 'c': {
+                    if (opts->act != AT_UNKNOWN) {
+                        printf ("Confilict actions!\n");
+                        err_flag = 1;
+                    }
+                    opts->act = AT_CLEANUP;
+                    break;
+                }
+                case 'u': {
+                    if (opts->obj != AT_UNKNOWN) {
+                        printf ("Confilict ActObjects!\n");
+                        err_flag = 1;
+                    }
+                    opts->obj = AO_USE;
+                    break;
+                }
+
+                case 'U': {
+                    if (opts->obj != AT_UNKNOWN) {
+                        printf ("Confilict ActObjects!\n");
+                        err_flag = 1;
+                    }
+                    opts->obj = AO_UMASK;
+                    break;
+                }
+
+                case 'm': {
+                    if (opts->obj != AT_UNKNOWN) {
+                        printf ("Confilict ActObjects!\n");
+                        err_flag = 1;
+                    }
+                    opts->obj = AO_MASK;
+                    break;
+                }
+                case 'k': {
+                    if (opts->obj != AT_UNKNOWN) {
+                        printf ("Confilict ActObjects!\n");
+                        err_flag = 1;
+                    }
+                    opts->obj = AO_KEYWORD;
+                    break;
+                }
+                case 'd': {
+                    if (opts->act != AT_UNKNOWN) {
+                        printf ("Confilict actions!\n");
+                        err_flag = 1;
+                    }
+                    opts->act = AT_DELETE;
+                    break;
+                }
+                case 'l': {
+                    if (opts->act != AT_UNKNOWN) {
+                        printf ("Confilict actions!\n");
+                        err_flag = 1;
+                    }
+                    opts->act = AT_LIST;
+                    break;
+                }
+                case 'v': {
+                    verbose = 1;
+                    break;
+                }
+                case '?':
+                    break;
+
+                default:
+                    printf("??\n");
+                    abort ();
+            }
+            if (err_flag)
+            {
+                free(opts);
+                opts = NULL;
+                break;
+            }
+        }
+
+        if (!err_flag)
+        {
+            memset(opts->args, 0, 1024);
+            if (optind < argc) {
+                while (optind < argc) {
+                    strncat(opts->args, argv[optind++], strlen(argv[optind]));
+                    strncat(opts->args, " ", 1);
+                }
+            }
+        }
+    }
+    PDEBUG ("opts: %p\n", opts);
+    return opts;
+}
+
 /**
  * Entry of KMU.
  *
@@ -1114,14 +1249,8 @@ int cleanup_localdist_resources(object obj)
  */
 int main(int argc, char **argv)
 {
-    int c;
-    ActType type = UNKNOWN;
-    object obj = UNKNOWN;
-    int ret=0;
-    char items[1024];
-    int err_flag = 0;
-
     PDEBUG ("enter\n");
+    int  ret = 0;
 
     if (geteuid() != 0) {
             fprintf(stderr, "Should be executed as root, do not complain if you are not!\n");
@@ -1129,142 +1258,29 @@ int main(int argc, char **argv)
 
     INIT_LIST(content_list, str_list);
 
-    /* Parse options from command line, store them into TYPE and OBJ */
-    while (1) {
-
-        /* getopt_long stores the option index here. */
-        int option_index = 0;
-
-        c = getopt_long (argc, argv, "adumklhcvU",
-                         long_options, &option_index);
-
-        /* Detect the end of the options. */
-        if (c == -1)
-            break;
-
-        switch (c) {
-        case 0: {
-            /* If this option set a flag, do nothing else now. */
-            if (long_options[option_index].flag != 0)
-                break;
-            printf ("option %s", long_options[option_index].name);
-            if (optarg)
-                printf (" with arg %s", optarg);
-            printf ("\n");
-            break;
-        }
-        case 'h': {
-            usage(argv);
-            return 1;
-            break;
-        }
-        case 'a': {
-            if (type != UNKNOWN) {
-                printf ("Confilict actions!\n");
-                err_flag = 1;
-            }
-            type = AT_ADD;
-            break;
-        }
-        case 'c': {
-            if (type != UNKNOWN) {
-                printf ("Confilict actions!\n");
-                err_flag = 1;
-            }
-            type = AT_CLEANUP;
-            break;
-        }
-        case 'u': {
-            if (obj != UNKNOWN) {
-                printf ("Confilict objects!\n");
-                err_flag = 1;
-            }
-            obj = USE;
-            break;
-        }
-
-        case 'U': {
-            if (obj != AT_UNKNOWN) {
-                printf ("Confilict objects!\n");
-                err_flag = 1;
-            }
-            obj = UMASK;
-            break;
-        }
-
-        case 'm': {
-            if (obj != UNKNOWN) {
-                printf ("Confilict objects!\n");
-                err_flag = 1;
-            }
-            obj = MASK;
-            break;
-        }
-        case 'k': {
-            if (obj != UNKNOWN) {
-                printf ("Confilict objects!\n");
-                err_flag = 1;
-            }
-            obj = KEYWORD;
-            break;
-        }
-        case 'd': {
-            if (type != UNKNOWN) {
-                printf ("Confilict actions!\n");
-                err_flag = 1;
-            }
-            type = AT_DELETE;
-            break;
-        }
-        case 'l': {
-            if (type != UNKNOWN) {
-                printf ("Confilict actions!\n");
-                err_flag = 1;
-            }
-            type = AT_LIST;
-            break;
-        }
-        case 'v': {
-            verbose = 1;
-            break;
-        }
-        case '?':
-            break;
-
-        default:
-            printf("??\n");
-            abort ();
-        }
-        if (err_flag) {
-            usage(argv);
-            return -1;
-        }
+    KmuOpt* opts = ParseOptions(argc, argv);
+    if (!opts)
+    {
+        usage(argv);
+        exit(1);
     }
 
-    memset(items, 0, 1024);
-    if (optind < argc) {
-        while (optind < argc) {
-            strncat(items, argv[optind++], strlen(argv[optind]));
-            strncat(items, " ", 1);
-        }
-    }
-
-    switch (type) {
+    switch (opts->act) {
     case AT_ADD: {
-        ret = add_obj(obj, items);
+        ret = add_obj(opts->obj, opts->args);
         break;
     }
 
     case AT_DELETE: {
-        ret = del_obj(obj, items);
+        ret = del_obj(opts->obj, opts->args);
         break;
     }
     case AT_LIST: {
-        ret = list_obj(obj, items);
+        ret = list_obj(opts->obj, opts->args);
         break;
     }
     case AT_CLEANUP:{
-        ret = cleanup_localdist_resources(obj);
+        ret = cleanup_localdist_resources(opts->obj);
         break;
     }
     default:

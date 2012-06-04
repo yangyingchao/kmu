@@ -92,16 +92,16 @@ typedef enum _ActType{
 } ActType;
 
 /* Object types */
-typedef enum _object{
-    UNKNOWN = 0,
-    KEYWORD,
-    MASK,
-    USE,
-    UMASK,
-} object;
+typedef enum _ActObject{
+    AO_UNKNOWN = 0,
+    AO_KEYWORD,
+    AO_MASK,
+    AO_USE,
+    AO_UMASK,
+} ActObject;
 
 typedef struct _type2path {
-    object  obj;
+    ActObject  obj;
     char   *path;
 } type2path;
 
@@ -149,9 +149,10 @@ typedef struct _HashTable
 
 typedef struct _KmuOpt
 {
-    bool     verbose;
-    ActType act;
-    object   obj;
+    bool      verbose;
+    ActType   act;
+    ActObject obj;
+    char      args[1024];
 } KmuOpt;
 
 

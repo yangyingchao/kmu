@@ -274,6 +274,10 @@ int InsertEntry(HashTable* table, char* key, void* val)
     return ret;
 }
 
+/*! Looks for the given data based on key.
+
+  @return void*
+*/
 void* GetEntryFromHashTable(HashTable* table, char* key)
 {
     TableEntry* entry = NULL;
