@@ -1225,9 +1225,16 @@ KmuOpt* ParseOptions(int argc, char **argv)
         {
             memset(opts->args, 0, 1024);
             if (optind < argc) {
+                strncpy(opts->args, argv[optind], strlen(argv[optind]));
+                strncat(opts->args, " ", 1);
+                optind ++;
+
                 while (optind < argc) {
-                    strncat(opts->args, argv[optind++], strlen(argv[optind]));
+                    printf("%d\n", optind);
+                    printf("%d: %s\n", optind, argv[optind++]);
+                    strncat(opts->args, argv[optind], strlen(argv[optind]));
                     strncat(opts->args, " ", 1);
+		    optind ++;
                 }
             }
         }
