@@ -68,16 +68,6 @@
 #define PRINT_DEBUG(format, args...)
 #endif
 
-#define PRINT_VERBOSE(format, args...)          \
-        do                                      \
-        {                                       \
-            if (verbose)                        \
-            {                                   \
-                printf(format, ##args);         \
-            }                                   \
-        } while (0)
-
-
 
 typedef unsigned int   uint32;
 

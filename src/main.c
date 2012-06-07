@@ -32,12 +32,24 @@
 #include <ftw.h>
 #include "util.h"
 
+
 #ifdef __APPLE__
 #define GET_TIME(X) (X)->st_mtimespec.tv_sec
 #else
 #define GET_TIME(X) (X)->st_mtime
 #endif
 
+#define PRINT_VERBOSE(format, args...)          \
+    do                                          \
+    {                                           \
+        if (opts->verbose)                      \
+        {                                       \
+            printf(format, ##args);             \
+        }                                       \
+    } while (0)
+
+
+
 /* Options will be parsed */
 static struct option long_options[] = {
     /* Actions */
@@ -80,7 +92,8 @@ static const int   HASH_SIZE    = 4096;
 static int         deleted      = 0;
 static int         freed_size   = 0;
 static int         verbose      = 0;
-str_list          *content_list = NULL;
+static KmuOpt*     opts         = NULL;
+str_list*          content_list = NULL;
 
 
 uint32 StringHashFunction(const char* str)
@@ -1101,9 +1114,13 @@ int cleanup_localdist_resources(ActObject obj)
     return ret;
 }
 
-KmuOpt* ParseOptions(int argc, char **argv)
+int ParseOptions(int argc, char **argv)
 {
-    KmuOpt* opts = (KmuOpt*)malloc(sizeof(KmuOpt));
+    int ret = -1;
+    if (!opts)
+    {
+        opts = (KmuOpt*)malloc(sizeof(KmuOpt));
+    }
     if (opts)
     {
         memset(opts, 0, sizeof(KmuOpt));
@@ -1226,17 +1243,15 @@ KmuOpt* ParseOptions(int argc, char **argv)
             memset(opts->args, 0, 1024);
             if (optind < argc) {
                 strncpy(opts->args, argv[optind], strlen(argv[optind]));
-                strncat(opts->args, " ", 1);
                 optind ++;
 
                 while (optind < argc) {
-                    printf("%d\n", optind);
-                    printf("%d: %s\n", optind, argv[optind++]);
-                    strncat(opts->args, argv[optind], strlen(argv[optind]));
                     strncat(opts->args, " ", 1);
+                    strncat(opts->args, argv[optind], strlen(argv[optind]));
 		    optind ++;
                 }
             }
+            ret = 0;
         }
     }
 
@@ -1247,7 +1262,7 @@ KmuOpt* ParseOptions(int argc, char **argv)
                 opts, opts->act, opts->obj, opts->args);
     }
 #endif
-    return opts;
+    return ret;
 }
 
 /**
@@ -1270,8 +1285,9 @@ int main(int argc, char **argv)
 
     INIT_LIST(content_list, str_list);
 
-    KmuOpt* opts = ParseOptions(argc, argv);
-    if (!opts) {
+    ret = ParseOptions(argc, argv);
+    if (ret < 0)
+    {
         usage(argv);
         exit(1);
     }
