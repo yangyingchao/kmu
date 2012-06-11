@@ -29,7 +29,6 @@
 #include <sys/stat.h>
 #include <dirent.h>
 #include <libgen.h>
-#include <ftw.h>
 #include "util.h"
 
 
@@ -185,58 +184,54 @@ void usage(char **argv)
  *
  * @return: char**
  */
-char **list_to_array()
+CharArray* list_to_array()
 {
-    PDEBUG ("called.\n");
-
     int size = content_list->un.counter;
     if (size <= 0) {
         printf("Empty list!\n");
         return NULL;
     }
 
-    size = size * sizeof(char *);
+    PDEBUG ("list, size: %d\n", size);
+    CharArray* ca = CharArrayCreate(size);
+    if (ca)
+    {
+        char** arrays = ca->array;
+        if (arrays != NULL) {
+            int i = 0;
+            int len = 0;
+            char tmp[256];
+            str_list *ptr = NULL;
 
-    PDEBUG ("A, size: %d\n", size);
-    char **arrays = malloc(size);
-    memset(arrays, 0, size);
-    PDEBUG ("B\n");
-
-    if (arrays != NULL) {
-        int i = 0;
-        int len = 0;
-        char tmp[256];
-        str_list *ptr = NULL;
-
-        ptr = content_list->next;
-        while (ptr) {
-            len = strlen(ptr->str);
-            if (ptr->un.flag == True || len  <= 1) {
-                PDEBUG ("%s will not saved.\n", ptr->str);
-                ptr = ptr->next;
-                continue;
-            }
-            else {
-                PDEBUG ("str: %s\n", ptr->str);
-
-                memset(tmp, 0, 256);
-                strncpy(tmp, ptr->str, len);
-                if (*(ptr->str+len-1) != '\n') {
-                    strcat(tmp, "\n");
+            ptr = content_list->next;
+            while (ptr) {
+                len = strlen(ptr->str);
+                if (ptr->un.flag == True || len  <= 1)
+                {
+                    PRINT_VERBOSE ("%s will not saved.\n", ptr->str);
+                    ptr = ptr->next;
+                    continue;
                 }
-                arrays[i] = strdup(tmp);
+                else
+                {
+                    memset(tmp, 0, 256);
+                    strncpy(tmp, ptr->str, len);
+                    if (*(ptr->str+len-1) != '\n') {
+                        strcat(tmp, "\n");
+                    }
+                    arrays[i] = strdup(tmp);
+                }
+                i++;
+                ptr = ptr->next;
             }
-            i++;
-            ptr = ptr->next;
+
+            PDEBUG ("Send to qsort, size: %d!\n", content_list->un.counter);
+            qsort((void *)&arrays[0], content_list->un.counter,
+                  sizeof(char *), cmpstringgp);
         }
-
-        PDEBUG ("Send to qsort, size: %d!\n", content_list->un.counter);
-        qsort((void *)&arrays[0], content_list->un.counter,
-              sizeof(char *), cmpstringgp);
     }
-    PDEBUG ("return\n");
 
-    return arrays;
+    return ca;
 }
 
 /**
@@ -271,7 +266,8 @@ int dump2file(const char *path)
     if (fd == -1)
         oops("Failed to mktemp");
 
-    char **array = list_to_array();
+    CharArray* ca = list_to_array();
+    char **array = ca->array;
     if (array == NULL) {
         fprintf(stderr, "ERROR: failed to convert list into string"
                 "Items will be recorded without order.\n");
@@ -337,18 +333,16 @@ int dump2file(const char *path)
  *
  * @return: bool
  */
-int should_skip(char *item)
+bool should_skip(char *item)
 {
-    int ret = 0;
-    if (strlen(item) <= 1)	/* Nothing but a newline, skip it. */
-        ret = 1;
-    else {
+    bool ret = true;
+    if (strlen(item) > 1) {	/* Nothing but a newline, skip it. */
         char *tmp = item;
-        while (*tmp == ' ') {
-            tmp ++;
+        while (*tmp == ' ') { // Skip leading white spaces.
+            ++tmp;
         }
-        if (*tmp == '\0' || *tmp == '#') {
-            ret = 1;
+        if (*tmp != '\0' && *tmp != '#') {
+            ret = false;
         }
     }
     return ret;
@@ -362,11 +356,9 @@ int should_skip(char *item)
  */
 int read_content(const char *path)
 {
-    size_t n;
     FILE *fd = NULL;
     ssize_t read;
     str_list *p = NULL;
-    char * item = NULL;
 
     if (access(path, F_OK)) {
         printf ("Orignal file doest not exist!\n");
@@ -376,31 +368,30 @@ int read_content(const char *path)
     if ((fd = fopen(path, "r")) == NULL) {
         oops("Failed to open file");
     }
-    while ((read = getline(&item, &n, fd)) != -1) {
-        PDEBUG ("item: %s\n", item);
 
-        if (should_skip(item)) {
-            PRINT_VERBOSE("Skip item: %s\n", item);
-            goto next;
+    size_t n;
+    char * item = NULL;
+    while ((read = getline(&item, &n, fd)) != -1)
+    {
+        // PDEBUG ("item: %s\n", item);
+        if (!should_skip(item))
+        {
+            p = (str_list *) malloc(sizeof(str_list));
+            memset(p, 0, sizeof(str_list));
+            p->str  = item;
+            p->next = NULL;
+            list_add(content_list, p);
+            content_list->un.counter ++;
         }
-
-        p = (str_list *) malloc(sizeof(str_list));
-        memset(p, 0, sizeof(str_list));
-        p->str = strdup(item);
-        p->next = NULL;
-        list_add(content_list, p);
-        content_list->un.counter ++;
-    next:
-        if (item) {
+        else
+        {
+            PRINT_VERBOSE("Skip item: %s\n", item);
             free(item);
         }
-        item = NULL;
-        continue;
-    }
-    PDEBUG ("End of loop\n");
 
-    if (item)
-        free(item);
+        item = NULL;
+    }
+    PDEBUG ("End of loop, total items: %d\n", content_list->un.counter);
 
     fclose(fd);
     return 0;
@@ -434,119 +425,92 @@ str_list *key_exist(const char *key)
  *
  * @return: int
 */
-int merge_use(str_list *p, const char *new)
+int merge_use(str_list *p, CharArray* ca2)
 {
-    char **item_old = strsplit(p->str);
-    char **item_new = strsplit(new);
-    char new_item[1024];
-    int i = 0, j = 0, size = 0, existed = 0;
-    char **new_array = NULL;
-    char *item;
-
-    char tmp[1024];
-
-    memset(new_item, 0, 1024);
-
-    PDEBUG ("Old str: %s, new: %s\n", p->str, new);
-
+    if (!p || !p->str || !strlen(p->str) || !ca2)
+    {
+        return -1;
+    }
 
     /* Caculate size to alloc. */
-    while (item_old[i]) {
-        size++;
-        i++;
-    }
-    i = 1;
-    while (item_new[i]) {
-        size++;
-        i++;
+    CharArray* ca1 = ParseString(p->str, true);
+    if (!ca1)
+    {
+        return -1;
     }
 
-    PDEBUG ("size = %d\n", size);
+    int size = ca1->size + ca2->size;
 
-    new_array = (char **)malloc(size * sizeof(char *));
+    PDEBUG ("Total size: %d\n", size);
 
-    i = 0;
-    while (item_old[i]) {
-        new_array[i] = strdup(item_old[i]);
+    CharArray* newCa = CharArrayCreate(size);
+
+    int i = 0;
+    while (ca1->array[i])
+    {
+        newCa->array[i] = strdup(ca1->array[i]);
         i++;
     }
     PDEBUG ("Finished to copy old USEs.\n");
+    CharArrayDestroy(ca1);
+
+    // Loop through ca2, and merge into newCa.
     i = 1;
-    while (item_new[i]) {
-        item = item_new[i];
-        if (!strlen(item)) {
+    int j = 0;
+    while (ca2->array[i])
+    {
+        bool found = false;
+        char* item = ca2->array[i];
+        if (!strlen(item))
+        {
             i++;
             continue;
         }
-        existed = 0;
         j = 1;
-        if (*item == '-') { /* -USE */
-            PDEBUG ("Delete item: %s\n", item);
-            while (new_array[j]) {
-                if (strstr(new_array[j], item+1) != NULL ) {
-                    if (strcmp(item+1, new_array[j]) == 0) {
-                        /* USE vs -USE */
-                        new_array[j] = strdup(item);
-                        existed = 1;
-                    }
-                    else if (strcmp(item, new_array[j]) == 0){
-                        /* -USE vs USE*/
-                        existed = 1;
-                    }
-                    else {
-                        /* Others */
-                        existed = 0;
-                    }
-                }
-                j++;
+        while (newCa->array[j])
+        {
+            char* target = newCa->array[j++];
+            PDEBUG ("Cmp: %s, %s\n",item, target);
+            if (strcmp(target+1, item+1) == 0) // USE found, copy into this place.
+            {
+                found = true;
+                strncpy(target, item, strlen(item));
+                break;
             }
         }
-        else { /* +USE */
-            PDEBUG ("Add item: %s\n", item);
-            while (new_array[j]) {
-                if (strstr(new_array[j], item)) {
-                    PDEBUG ("Found: %s\n",new_array[j]);
-                    if (*new_array[j] == '-' &&
-                        strcmp(new_array[j]+1, item) == 0) {
-                        PDEBUG ("Remove '-' from use!\n");
-                        new_array[j] = strdup(item);
-                        existed = 1;
-                    }
-                    else if (strcmp(new_array[j], item) == 0){
-                        existed = 1;
-                        PDEBUG ("%s: Excactly the same, skip.\n", item);
-                    }
-                    else {
-                        PDEBUG ("Not the same: %s VS %s\n",
-                                new_array[j], item);
-                    }
-                }
-                j++;
-            }
-        }
-        PDEBUG ("Existed ?%s\n", existed?"Y":"N");
-        if (!existed) {
-            PDEBUG ("Add: %d-%s\n", j, item);
-            new_array[j] = strdup(item);
+        if (!found) // Append USE to the tail
+        {
+            newCa->array[j] = strdup(item);
         }
         i++;
     }
-    PDEBUG ("Finished to merge into char **\n");
+    PDEBUG ("Finished to merge into CharArray\n");
 
     j++;
-    new_array[j] = NULL;
+    newCa->array[j] = NULL;
     i = 0;
-    while (new_array[i]) {
-        PDEBUG ("new_array[%d] = %s\n", i, new_array[i]);
+    char tmp[1024];
+    char new_item[1024];
+    memset(new_item, 0, 1024);
 
+    while (newCa->array[i])
+    {
+        char* ptr = newCa->array[i];
+        PDEBUG ("newCa->array[%d] = %s\n", i, ptr);
         memset(tmp, 0, 1024);
         memcpy(tmp, new_item, strlen(new_item));
-        if (strlen(new_item)){
-            sprintf (tmp, "%s %s", new_item, new_array[i]);
+        if (*ptr == '+')
+        {
+            ++ ptr;
+        }
+
+        if (strlen(new_item))
+        {
+            sprintf (tmp, "%s %s", new_item, ptr);
             memcpy(new_item, tmp, strlen(tmp));
         }
         else {
-            sprintf(new_item, "%s", new_array[i]);
+            sprintf(new_item, "%s", ptr);
         }
         i++;
     }
@@ -573,11 +537,13 @@ int add_obj(ActObject obj, const char *input_str)
         return -1;
     }
 
+    int ret = 0;
     char *path;
     printf("Adding new Item to %s.\n", obj_desc[obj]);
     path = GetPathFromType(obj);
     if (path == NULL){
-        oops("Failed to get path according to ActObject!\n");
+        printf ("Failed to get path according to ActObject!\n");
+        return -1;
     }
 
     if (read_content(path) == -1) {
@@ -588,30 +554,35 @@ int add_obj(ActObject obj, const char *input_str)
     str_list *p = NULL;
     switch (obj) {
         case AO_USE: { /* USEs may need to be merged. */
-            char **margv = strsplit(input_str);
-            p = key_exist(margv[0]);
-            free_array(margv);
+            CharArray *margv = ParseString(input_str, true);
+            p = key_exist(margv->array[0]);
             if (p != NULL) { /* Merge USE */
                 char c;
                 printf("Item %s is already in the destination!\n"
-                       "Orignal content: %s\n", margv[0],  p->str);
+                       "Orignal content: %s\n", margv->array[0],  p->str);
                 printf ("Would you like to merge it ?\n");
                 c = fgetc(stdin);
                 if ((c == 'Y') || (c == 'y')) {
-                    if (merge_use(p, input_str) != 0) {
+                    if (merge_use(p, margv) != 0) {
                         fprintf(stderr, "ERROR: Failed to merge use "
                                 "please update it manually!\n");
-                        return -1;
+                        ret = -1;
+                        goto free;
                     }
                     PDEBUG ("After merged: %s\n", p->str);
 
+                    CharArrayDestroy(margv);
                     goto dump_add;
                 }
                 else {
                     printf ("New item was not added to database.\n");
-                    return 0;
+                    ret = 0;
+                    goto free;
                 }
             }
+      free:
+            CharArrayDestroy(margv);
+            goto out;
         }
 
             /* Fall through */
@@ -630,8 +601,9 @@ int add_obj(ActObject obj, const char *input_str)
     }
 dump_add:
     printf ("Item added: %s\n", p->str);
-    int ret = dump2file(path);
+    ret = dump2file(path);
     free(path);
+out:
     return ret;
 }
 
@@ -676,22 +648,21 @@ int list_obj(ActObject obj, const char *key)
     else {
         PDEBUG ("key: %s\n", key);
 
-        char **margv = strsplit(key);
-        char **items = NULL;
+        CharArray* margv = ParseString(key, false);
         int i = 0;
         printf("Found entries including (%s):\n", key);
-        while (margv[i]) {
+        while (margv->array[i]) {
             ptr = content_list->next;
             while (ptr) {
-                items = strsplit(ptr->str);
-                if (strstr(items[0], margv[i]))
+                CharArray* items = ParseString(ptr->str, false);
+                if (strstr(items->array[0], margv->array[i]))
                     printf ("    %s", ptr->str);
-                free_array(items);
+                CharArrayDestroy(items);
                 ptr = ptr->next;
             }
             i++;
         }
-        free_array(margv);
+        CharArrayDestroy(margv);
     }
     return 0;
 }
@@ -715,7 +686,7 @@ int del_obj(ActObject obj, const char *input_str)
         return -1;
     }
 
-    printf("Deleting entry for: %s.\n", obj_desc[obj]);
+    printf("Deleting Object: %s.\n", obj_desc[obj]);
     if (path == NULL){
         printf ("Failed to get path according to ActObject!\n");
         return -1;
@@ -728,23 +699,22 @@ int del_obj(ActObject obj, const char *input_str)
         return -1;
     }
 
-    char **margv = strsplit(input_str);
+    CharArray* ca = ParseString(input_str, false);
     str_list *ptr = NULL;
-    while (margv[i]) {
+    while (ca->array[i]) {
         ptr  = content_list->next;
-        PDEBUG ("Target: %s\n", margv[i]);
+        PDEBUG ("Target: %s\n", ca->array[i]);
         while (ptr) {
-            if (strstr(ptr->str, margv[i])) {
+            if (strstr(ptr->str, ca->array[i])) {
                 printf ("Item: %s", ptr->str);
                 ptr->un.flag = True;
-                content_list->un.counter --;
                 counter++;
             }
             ptr = ptr->next;
         }
         i++;
     }
-    free_array(margv);
+    CharArrayDestroy(ca);
 
     printf ("\nI found %d item(s).\n", counter);
 
@@ -768,7 +738,9 @@ int del_obj(ActObject obj, const char *input_str)
         }
     }
     else if (counter == 1) {
+        PDEBUG ("before: %d\n", content_list->un.counter);
         content_list->un.counter -= 1;
+        PDEBUG ("after: %d\n", content_list->un.counter);
         ret = dump2file(path);
     }
     else
@@ -1291,8 +1263,6 @@ int main(int argc, char **argv)
         usage(argv);
         exit(1);
     }
-
-    PDEBUG ("%d\n", opts->act);
 
     switch (opts->act) {
     case AT_ADD: {

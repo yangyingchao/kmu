@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <ctype.h>
 
 const char *dist_path = "/usr/portage/distfiles/";
 
@@ -22,60 +23,97 @@ const char *reserved[] = {
     NULL
 };
 
+static const char* FMT1 = "%s";
+static const char* FMT2 = "+%s";
+
 /**
- * strsplit - Split a string into an array, splitted by whitspace.
+ * ParseString - Split a string into an array, splitted by whitspace.
  * @str - Character string
- *
+ * @flag - flag to indicate whether a prefix is needed.
  * Return: char**
  *
  * NOTE: The leading character will be stripped if its is one of the
  * following:
  * ['=', '<', '>']
  */
-char **strsplit(const char *str)
+CharArray* ParseString(const char *str, bool flag)
 {
     int i=0, num=0;
-    char **array = NULL;
-    char *ptr = NULL, *p = NULL;
-    char tmp_str[strlen(str)+1];
 
+    char* tmp_str = (char*)malloc(strlen(str)+1);
     memset(tmp_str, 0, strlen(str)+1);
-
     strcpy(tmp_str, str);
-    p = tmp_str;
+    char* p   = tmp_str;
+    char* ptr = NULL;
     /* Compute total number of white spaces */
     while ((ptr = strchr(p, ' ')) != NULL) {
         num++;
         p = ptr + 1;
     }
 
-    /* Alloc memory for new array */
-    array = (char **)calloc(num+2, sizeof(char *));
+    CharArray* ca = CharArrayCreate(num+2);
+    if (!ca)
+    {
+        free(tmp_str);
+        return NULL;
+    }
 
     /* Strip some leading characters */
     p = tmp_str;
-    if (*p == '=' || *p == '<' || *p == '>') {
+    if (*p == '=' || *p == '<' || *p == '>' || *p == ' ')
+    {
         p++;
     }
+
+    char** array = ca->array;
+    const char* fmt;
+    size_t length = 0;
     /* Copy components of string into array. */
     while ((ptr = strchr(p, ' ')) != NULL) {
         *ptr = '\0';
-        if (strlen(p)) {
-            array[i] = strdup(p);
+        if (strlen(p))
+        {
+            length = strlen(p) + 1;
+            array[i] = (char*)malloc(length);
+            memset(array[i], 0, length);
+            if (i == 0 || !isalpha(*p) || !flag)
+            {
+                fmt = FMT1;
+            }
+            else
+            {
+                fmt = FMT2;
+            }
+            sprintf(array[i], fmt, p);
             i++;
         }
         p = ptr + 1;
     }
 
-    /* XXX: Append the last component if it is not obscurer character.*/
-    if ((strlen(p) > 1) || (*p >= '0')) {
-        while ((ptr = strchr(p, '\n')) != NULL) {
+    /* XXX: Append the last component if it is not strange character.*/
+    length = strlen(p) + 1;
+    if (length > 2 && (*p >= '0' || *p == '-' || *p == '+'))
+    {
+        while ((ptr = strchr(p, '\n')) != NULL)
+        {
             *ptr = '\0';
         }
-        array[i++]=strdup(p);
+
+        array[i] = (char*)malloc(length);
+        memset(array[i], 0, length);
+        if (!isalpha(*p) || !flag)
+        {
+            fmt = FMT1;
+        }
+        else
+        {
+            fmt = FMT2;
+        }
+        sprintf(array[i++], fmt, p);
+        PDEBUG ("Appended: %s\n",array[i]);
     }
     array[i] = 0;
-    return array;
+    return ca;
 }
 
 /**
@@ -130,21 +168,46 @@ char * name_split(const char *fullname)
     return NULL;
 }
 
+CharArray* CharArrayCreate(int size)
+{
+    CharArray* ca = malloc(sizeof(CharArray));
+    if (ca)
+    {
+        memset(ca, 0, sizeof(*ca));
+        ca->size = size;
+        /* Alloc memory for new array */
+        ca->array = (char **)calloc(size, sizeof(char *));
+        if (!ca->array)
+        {
+            free(ca);
+            ca = NULL;
+        }
+    }
+    return ca;
+}
+
 /**
- * free_array - Free allocated memory.
+ * CharArrayCreate - Free allocated memory.
  * @array - Character array
  *
  * Return: void
  */
-void free_array(char **array)
+void CharArrayDestroy(CharArray* ca)
 {
-    if (array != NULL) {
-        int i = 0;
-        while (array[i]) {
-            free(array[i]);
-            i++;
+    if (ca)
+    {
+        if (ca->array)
+        {
+            int i = 0;
+            while (ca->array[i]) {
+                free(ca->array[i]);
+                i++;
+            }
+            free(ca->array[i]);
+            free(ca->array);
         }
-        free(array[i]);
+        free(ca);
+        ca = NULL;
     }
 }
 

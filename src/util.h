@@ -60,14 +60,6 @@
 #define PDEBUG(fmt, args...)  ;
 #endif
 
-#ifdef DEBUG
-#define PRINT_DEBUG(format, args...)                        \
-    printf("%s(%d)-%s:\t",__FILE__,__LINE__,__FUNCTION__);  \
-    printf("\033[31m"format"\033[0m", ##args);
-#else
-#define PRINT_DEBUG(format, args...)
-#endif
-
 
 typedef unsigned int   uint32;
 
@@ -146,6 +138,12 @@ typedef struct _KmuOpt
 } KmuOpt;
 
 
+typedef struct _CharArray
+{
+    int    size;
+    char** array;
+} CharArray;
+
 
 // Functions.
 void HashTableDestroy(HashTable* table);
@@ -153,10 +151,13 @@ HashTable* HashTableCreate(uint32 size, HashFunction cFunctor, DestroyFunction d
 int InsertEntry(HashTable* table, char* key, void* val);
 void* GetEntryFromHashTable(HashTable* table, char* key);
 
-char **strsplit(const char *str);
+CharArray* ParseString(const char *str, bool flag);
 int should_reserve(const char *key);
 char *name_split(const char *fullname);
-void free_array(char **array);
+
+CharArray* CharArrayCreate(int size);
+void CharArrayDestroy(CharArray* array);
+
 
 void list_add(str_list *root, void *new);
 
