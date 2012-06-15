@@ -988,7 +988,7 @@ int real_delete(int doit)
  */
 int cleanup_localdist_resources(ActObject obj)
 {
-    int ret;
+    int ret = 0;
     char c;
     if (obj == AO_UNKNOWN)
     {
