@@ -567,7 +567,7 @@ int add_obj(ActObject obj, const char *input_str)
                         fprintf(stderr, "ERROR: Failed to merge use "
                                 "please update it manually!\n");
                         ret = -1;
-                        goto free;
+                        CharArrayDestroy(margv);
                     }
                     PDEBUG ("After merged: %s\n", p->str);
 
@@ -577,12 +577,9 @@ int add_obj(ActObject obj, const char *input_str)
                 else {
                     printf ("New item was not added to database.\n");
                     ret = 0;
-                    goto free;
+                    CharArrayDestroy(margv);
                 }
             }
-      free:
-            CharArrayDestroy(margv);
-            goto out;
         }
 
             /* Fall through */
