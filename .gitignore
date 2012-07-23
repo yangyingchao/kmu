@@ -11,4 +11,4 @@ config.status
 src/kmu
 *.o
 stamp-h1
-
+*~
