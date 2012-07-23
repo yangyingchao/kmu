@@ -499,7 +499,7 @@ int merge_use(str_list *p, CharArray* ca2)
         PDEBUG ("newCa->array[%d] = %s\n", i, ptr);
         memset(tmp, 0, 1024);
         memcpy(tmp, new_item, strlen(new_item));
-        if (*ptr == '+')
+        if (*ptr == '+') // Skip "+" sign.
         {
             ++ ptr;
         }
@@ -600,7 +600,6 @@ dump_add:
     printf ("Item added: %s\n", p->str);
     ret = dump2file(path);
     free(path);
-out:
     return ret;
 }
 
@@ -793,7 +792,7 @@ void PkgInfoDestroy(void *data)
 }
 
 /**
- * process_file - Called by ftw(), process single file.
+ * process_file - process single file.
  * @fpath - Character fpath
  * @sb -  sb
  * @typeflag - Type of
@@ -1217,7 +1216,7 @@ int ParseOptions(int argc, char **argv)
                 while (optind < argc) {
                     strncat(opts->args, " ", 1);
                     strncat(opts->args, argv[optind], strlen(argv[optind]));
-		    optind ++;
+                    optind ++;
                 }
             }
             ret = 0;
