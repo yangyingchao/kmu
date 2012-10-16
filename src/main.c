@@ -29,6 +29,7 @@
 #include <sys/stat.h>
 #include <dirent.h>
 #include <libgen.h>
+#include <stdbool.h>
 #include "util.h"
 
 
@@ -910,7 +911,7 @@ int process_file(char *fpath)
  *
  * @return: int
  */
-int real_delete(int doit)
+int do_delete(bool doit)
 {
     int ret = 0;
     int i = 0;
@@ -1031,7 +1032,7 @@ int cleanup_localdist_resources(ActObject obj)
                 printf ("No outdated file found!\n");
                 goto out;
             }
-            ret = real_delete(0);
+            ret = do_delete(false);
             printf ("\nGoing to deleted %d files,  %dM diskspace will be freed.\n",
                     deleted,  freed_size/1024/1024);
             printf ("Keep going? [Y]\n");
@@ -1042,7 +1043,7 @@ int cleanup_localdist_resources(ActObject obj)
             }
             else
             {
-                ret = real_delete(1);
+                ret = do_delete(true);
                 if (ret)
                 {
                     fprintf(stderr, "ERROR: Failed to execute delete command!\n");
