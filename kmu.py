@@ -24,115 +24,264 @@
 #####################################################################
 # -*- coding: utf-8 -*-
 
-from argparse import *
 import os
 import sys
+import glob
+import shutil
 
+help='''Usage: kmu -a|d|l|h -k|m|u|U [package_string]
+    ****** Operations: ********
+    -a, --add: 	Add an ActObject
+    -d, --delete: 	Delete an ActObject
+    -l, --list: 	List an ActObject
+    -c, --clean: 	Clean local resources
+    -h, --help: 	Print this message
+    ****** Objects: ********
+    k, keyword: Accept a new keyword specified by package_string
+    m, mask: 	mask a new keyword specified by package_string
+    u, use: 	Modify or add new use to package_string
+    U, Umask: 	Unmask a package
+    ****** Examples: ******
+    To list all keywords stored in /etc/portage/package.keyword:
+        kmu -lk
+    To add a keyword into /etc/portage/package.keyword:
+        kmu -ak
+    To delete keyword entry which includes xxx
+        kmu -du xxx
+'''
 
-func   = None # Function pointer to be executed.
-target = None # Target to be operated.
-target_list = {'k': 'Keyword',
-               'm': 'Mask',
-               'u': 'Use',
-               'U': 'Unmask'}
-def usage():
-    """Show usage
+class PortageObject(object):
+    """Generic object for portage files.
     """
-    print("Showing usge:\n\n")
-    get_parser().print_help()
+    def __init__(self, target):
+        """
+        """
+        self.path = {
+            'k': "/etc/portage/package.keywords/keywords",
+            'm': "/etc/portage/package.mask/mask",
+            'u': "/etc/portage/package.use/use",
+            'U': "/etc/portage/package.unmask/unmask",
+            None: '/usr/portage/distfiles'
+            }.get(target, None)
 
-def add_obj(args):
-    print("Adding %s"%target_list.get(target))
-    if not args:
-        print ("Add action requires a targe!\n")
-        usage()
-        sys.exit(1)
+        if self.path and os.getenv("EPREFIX"):
+            #Used by gentoo prefix(MacOsX).
+            self.path = os.path.join(os.getenv("EPREFIX"), self.path)
 
+        self.contents = []
+        try:
+            self.contents = open(self.path).readlines()
+            self.__parse__()
+        except :
+            self.contents=[]
 
-def list_obj(args):
-    print(args)
-    print(target)
-    pass
+    def Help(self):
+        """
+        """
+        print(help)
 
-def delete_obj(args):
-    print(args)
-    print(target)
-    pass
+    def Action(self, action, args):
+        func = {
+            'a' : self.__add_obj__,
+            'd' : self.__del_obj__,
+            'l' : self.__list_obj__,
+            'c' : self.__clean_obj__,
+            'h' : self.__usage__
+            }.get(action, lambda x : print("Unkown usage, showing help\n\n"+help))(args)
+        pass
 
-def clean_obj(args):
-    print(args)
-    print(target)
-    pass
+    def __str__(self):
+        """
+        """
+        sep=""
+        return sep.join(self.contents)
 
-class ActionAction(Action):
-    def __call__(self, parser, namespace, values, option_string=None):
-        # set global function pointer directly!
-        global func
-        setattr(namespace, self.dest, values)
-        if self.dest == 'add':
-            func = add_obj
-        elif self.dest == 'list':
-            func = list_obj
-        elif self.dest == 'delete':
-            func = delete_obj
-        elif self.dest =='clean':
-            func = clean_obj
-        else:
-            print("Unknown action: %s\n"%values)
-            get_parser().print_help()
+    def __parse__(self):
+        """
+        """
+        pass
+
+    def __get_portage_dir__(self):
+        # todo: add overlays.
+        path = "/usr/portage"
+        if os.getenv("EPREFIX"):
+            path.join(os.getenv("EPREFIX"), path)
+        return [path]
+
+    def __validate_item(item):
+        """Validate item, returns an item that can be recognized by portage.
+
+        Arguments:
+        - `item`: item to be validate.
+        """
+        first  = None
+        second = None
+        # if '/' in item:
+        #     cmps=item.split('/')
+        #     fist   = cmps[0]
+        #     second = cmps[1]
+        # else:
+        #     second = item
+
+        # portage_dirs = __get_portage_dir__()
+        # if first:
+        #     candidates = []
+        #     for path in portage_dirs:
+        #         candidates.extends(glob.glob(os.path.join(path, "*")))
+        return item
+
+    def __dump__(self):
+        """write contents back to disk file
+        """
+        if self.path is None:
+            print("Can't decide where to write files.!")
             sys.exit(1)
 
-        global target
-        if values not in target_list.keys():
-            print("Unknown target: %s\n"%values)
-            get_parser().print_help()
+        dirn = os.path.dirname(self.path)
+        if os.path.exists(dirn) and not os.path.isdir(dirn):
+            self.__merge_from_file(dirn)
+            os.shutil.copy(dirn, dirn+"bakup")
+            os.remove(dirn)
+
+        os.makedirs(dirn, exist_ok=True)
+        result = ""
+        for item in self.contents:
+            result += item.strip("\n") + "\n"
+        try:
+            open(self.path, "w").write(result)
+        except IOError as e:
+            print("failed to write to file: %s, reason: %s.\n"%(self.path, e.strerror))
             sys.exit(2)
+
+    def __add_obj__(self, args):
+        """
+        Arguments:
+        - `args`:
+        """
+        if not args:
+            print("Adding operation needs arguments, showing usage\n\n")
+            self.Help()
+            sys.exit(1)
+        item = " "
+        item.join(args)
+        print("Adding %s to %s"%(item, self.path))
+        self.contents.append(item)
+        self.__dump__()
+
+    def __del_obj__(self, args):
+        """
+        Arguments:
+        - `args`:
+        """
+        if not args:
+            print("Adding operation needs arguments, showing usage\n\n")
+            self.Help()
+            sys.exit(1)
+
+        pass
+
+    def __list_obj__(self, args):
+        """
+        Arguments:
+        - `args`:
+        """
+        if not self.contents:
+            print("No entries in %s\n"%self.path)
+            sys.exit(1)
+
+        print("Listing %s contains: %s"%( self.path, " ".join(args) if args else "all item"))
+        if args:
+            result=[]
+            for entry in self.contents:
+                for item in args:
+                    if item in entry:
+                        print("%s --- %s"%(item, entry))
+                        result.append(entry)
+            if result:
+                print(result)
+                print("\nTotal %d entries found, as follows\n\n%s"%(
+                    len(result), "".join(result)))
+            else:
+                print("\n No entry found.\n")
         else:
-            target = values
+            item = ""
+            print(item.join(self.contents))
 
-def get_parser():
-    """Return arg parser.
+        pass
+
+    def __clean_obj__(self, args):
+        """
+        Arguments:
+        - `args`:
+        """
+        pass
+
+    def __usage__(self, args):
+        """
+        Arguments:
+        - `args`:
+        """
+        pass
+
+class USEPortageObject(PortageObject):
+
+    def __init__(self, path):
+        """
+        """
+        PortageObject.__init__(self, path)
+        pass
+
+    def __parse__(self):
+        """
+        """
+        pass
+    def __add_obj__(self, args):
+        """
+        Arguments:
+        - `args`:
+        """
+
+class DistPortageObject(PortageObject):
     """
-    parser = ArgumentParser("kmu",
-                             description="Manage your KEYWORD, MASK and USE",
-                             epilog='''****** Examples: ******
-    List all keywords stored in /etc/portage/package.keyword:
-        kmu -lk any_string
-    Add a keyword into /etc/portage/package.keyword:
-        kmu -ak any_string
-    Delete keyword entry which includes xxx
-        kmu -du any_string
+    """
 
-''',
-                             formatter_class=RawDescriptionHelpFormatter)
+    def __init__(self, path):
+        """
+        """
+        PortageObject.__init__(self, path)
+        pass
 
-    group = parser.add_mutually_exclusive_group()
-    group.add_argument("-a", "--add", action=ActionAction,  help="Delete an object.",)
-    group.add_argument("-d", "--delete", action=ActionAction,help="Add an object.")
-    group.add_argument("-l", "--list",   action=ActionAction,help="List object(s).")
-    group.add_argument("-c", "--clean",   action=ActionAction,help="clean object(s).")
+    def __clean_obj(self, args):
+        """
+        Arguments:
+        - `args`:
+        """
+        pass
 
-    parser.add_argument("content", nargs="*")
-    return parser
 
 if __name__ == '__main__':
 
-    argp = get_parser()
+    #TODO: Usage argparse to do the parsing.
+    args = sys.argv
+    if len(args) == 1:
+        usage()
+        sys.exit(1)
 
-    if len(sys.argv) == 1:
-        argp.print_help()
-        sys.exit(0)
+    app = args.pop(0)
+    commbo = args.pop(0)
+    if (not commbo.startswith('-')) or \
+        (len(commbo) != 2 and len(commbo) != 3):
+        usage()
+        sys.exit(1)
 
-    opts = argp.parse_args()
+    action = commbo[1]
+    target = None if len(commbo) == 2 else commbo[2]
+    executer = {
+        'u' : USEPortageObject,
+        None : DistPortageObject
+    }.get(target, PortageObject)(target)
 
-    if func:
-        func(opts.__getattribute__('content'))
-
-    # for k in ['add', 'delete', 'list']:
-    #     if opts.get(k):
-
-
-
+    executer.Action(action, args)
 
 # Editor modelines
 
