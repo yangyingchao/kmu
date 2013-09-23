@@ -144,11 +144,8 @@ class PortageObject(object):
             os.remove(dirn)
 
         os.makedirs(dirn, exist_ok=True)
-        result = ""
-        for item in self.contents:
-            result += item.strip("\n") + "\n"
         try:
-            open(self.path, "w").write(result)
+            open(self.path, "w").write(self.__str__())
         except IOError as e:
             print("failed to write to file: %s, reason: %s.\n"%(self.path, e.strerror))
             sys.exit(2)
@@ -191,14 +188,12 @@ class PortageObject(object):
 
         print("Listing %s contains: %s"%( self.path, " ".join(args) if args else "all item"))
         if args:
-            result=[]
+            result=set()
             for entry in self.contents:
                 for item in args:
                     if item in entry:
-                        print("%s --- %s"%(item, entry))
-                        result.append(entry)
+                        result.add(entry)
             if result:
-                print(result)
                 print("\nTotal %d entries found, as follows\n\n%s"%(
                     len(result), "".join(result)))
             else:
@@ -223,8 +218,48 @@ class PortageObject(object):
         """
         pass
 
-class USEPortageObject(PortageObject):
+    def __str__(self):
+        """
+        """
+        return "".join(self.contents)
 
+
+class UseFlag:
+    def __init__(self, record):
+        if record.startswith('-'):
+            self._use = record[1:]
+            self._sign   = '-'
+        else:
+            self._use = record
+            self._sign   = ''
+
+    def __str__(self):
+        return self._sign+self._use
+
+    def __hash__(self):
+        return hash(self._use)
+
+class UseRecord:
+    def __init__(self, entry):
+        cmps = entry.split()
+        self._name = cmps.pop(0);
+        self._flags = {}
+        for e in cmps:
+            flag = UseFlag(e)
+            self._flags[flag._use] = flag
+
+    def __str__(self):
+        result = self._name
+        for flag in self._flags.values():
+            result += " " + str(flag)
+        return result
+
+    def merge(self, args):
+        for e in args:
+            nflag = UseFlag(e)
+            self._flags[nflag._use] = nflag
+
+class UsePortageObject(PortageObject):
     def __init__(self, path):
         """
         """
@@ -232,14 +267,41 @@ class USEPortageObject(PortageObject):
         pass
 
     def __parse__(self):
-        """
-        """
+        self.records = {}
+        for entry in self.contents:
+            record = UseRecord(entry)
+            self.records[record._name] = record
         pass
+
     def __add_obj__(self, args):
         """
         Arguments:
         - `args`:
         """
+        if not args or len(args) < 1:
+            print("Adding operation needs arguments, showing usage\n\n")
+            self.Help()
+            sys.exit(1)
+        print(self.__str__())
+
+        # Check if use entry exists in self.records, merge it if exists!
+        record = self.records.pop(args[0], None)
+        if record is None:
+            record = UseRecord(" ".join(args))
+        else:
+            record.merge(args[1:])
+        self.records[record._name] = record
+
+        self.__dump__()
+        print(self.__str__())
+
+
+    def __str__(self):
+        result = ""
+        for record in self.records.values():
+            result += str(record) + "\n"
+        return result
+
 
 class DistPortageObject(PortageObject):
     """
@@ -277,7 +339,7 @@ if __name__ == '__main__':
     action = commbo[1]
     target = None if len(commbo) == 2 else commbo[2]
     executer = {
-        'u' : USEPortageObject,
+        'u' : UsePortageObject,
         None : DistPortageObject
     }.get(target, PortageObject)(target)
 
