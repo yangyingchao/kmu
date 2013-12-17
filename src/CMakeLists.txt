@@ -1,0 +1,1 @@
+add_executable(kmu main.c util.c)
