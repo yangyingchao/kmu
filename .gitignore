@@ -13,3 +13,6 @@ src/kmu
 stamp-h1
 *~
 /cmake_install.cmake
+CMakeFiles/
+/src/cmake_install.cmake
+/CMakeCache.txt
