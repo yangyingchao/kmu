@@ -16,3 +16,4 @@ stamp-h1
 CMakeFiles/
 /src/cmake_install.cmake
 /CMakeCache.txt
+/install_manifest.txt
