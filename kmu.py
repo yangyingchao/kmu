@@ -351,14 +351,11 @@ if __name__ == '__main__':
 
     opts = parser.parse_args(sys.argv[1:])
 
-    if opts.action != 'clean':
-        executer = {
-            'u' : UsePortageObject,
-            None : DistPortageObject
+    executer = {
+        'u' : UsePortageObject,
+        None : DistPortageObject
         }.get(opts.target, PortageObject)(opts)
-        executer.Action()
-    else:
-        print("Clean is not implemented yet, you can try C version kmu instead...")
+    executer.Action()
 
 # Editor modelines
 
