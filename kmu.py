@@ -28,41 +28,56 @@ import os
 import sys
 import glob
 import shutil
+import argparse
 
-help='''Usage: kmu -a|d|l|h -k|m|u|U [package_string]
-    ****** Operations: ********
-    -a, --add: 	Add an ActObject
-    -d, --delete: 	Delete an ActObject
-    -l, --list: 	List an ActObject
-    -c, --clean: 	Clean local resources
-    -h, --help: 	Print this message
-    ****** Objects: ********
-    k, keyword: Accept a new keyword specified by package_string
-    m, mask: 	mask a new keyword specified by package_string
-    u, use: 	Modify or add new use to package_string
-    U, Umask: 	Unmask a package
-    ****** Examples: ******
-    To list all keywords stored in /etc/portage/package.keyword:
-        kmu -lk
-    To add a keyword into /etc/portage/package.keyword:
-        kmu -ak
-    To delete keyword entry which includes xxx
-        kmu -du xxx
+desc = '''Simple tool to manager keyword/(un)mask/use for Gentoo'''
+elog = '''
+Where OBJECT could be one of the following:
+k, keyword: Accept a new keyword specified by package_string
+m, mask: 	mask a new keyword specified by package_string
+u, use: 	Modify or add new use to package_string
+U, Umask: 	Unmask a package
+
+****** Examples: ******
+To list all keywords stored in /etc/portage/package.keyword:
+	kmu -lk
+To add a keyword into /etc/portage/package.keyword:
+	kmu -ak
+To delete keyword entry which includes xxx
+	kmu -du xxx
 '''
+objs=['k', 'm', 'u', 'U']
+
+class FooAction(argparse.Action):
+    def __init__(self, option_strings, dest, nargs=None, **kwargs):
+        if nargs is not None:
+            raise ValueError("nargs not allowed")
+        super(FooAction, self).__init__(option_strings, dest, **kwargs)
+        pass
+    def __call__(self, parser, namespace, values, option_string=None):
+        if namespace.__dict__.get('action'):
+            print("Conflict actions: %s vs %s, showing usage...\n"%(
+                self.dest, getattr(namespace, 'action')))
+            parser.print_help()
+            sys.exit(1)
+
+        setattr(namespace, 'action', self.dest)
+        setattr(namespace, 'target', values)
 
 class PortageObject(object):
     """Generic object for portage files.
     """
-    def __init__(self, target):
+    def __init__(self, opts):
         """
         """
-        self.path = {
+        self.opts   = opts
+        self.path   = {
             'k': "/etc/portage/package.keywords/keywords",
             'm': "/etc/portage/package.mask/mask",
             'u': "/etc/portage/package.use/use",
             'U': "/etc/portage/package.unmask/unmask",
             None: '/usr/portage/distfiles'
-            }.get(target, None)
+            }.get(opts.target, None)
 
         if self.path and os.getenv("EPREFIX"):
             #Used by gentoo prefix(MacOsX).
@@ -78,16 +93,16 @@ class PortageObject(object):
     def Help(self):
         """
         """
-        print(help)
+        parser.print_help()
 
-    def Action(self, action, args):
+    def Action(self):
         func = {
-            'a' : self.__add_obj__,
-            'd' : self.__del_obj__,
-            'l' : self.__list_obj__,
-            'c' : self.__clean_obj__,
-            'h' : self.__usage__
-            }.get(action, lambda x : print("Unkown usage, showing help\n\n"+help))(args)
+            'add' : self.__add_obj__,
+            'delete' : self.__del_obj__,
+            'list' : self.__list_obj__,
+            'clean' : self.__clean_obj__,
+            }.get(self.opts.action,
+                  lambda x : parser.print_help())()
         pass
 
     def __str__(self):
@@ -150,47 +165,44 @@ class PortageObject(object):
             print("failed to write to file: %s, reason: %s.\n"%(self.path, e.strerror))
             sys.exit(2)
 
-    def __add_obj__(self, args):
+    def __add_obj__(self):
         """
         Arguments:
-        - `args`:
         """
-        if not args:
+        if not self.opts.args:
             print("Adding operation needs arguments, showing usage\n\n")
             self.Help()
             sys.exit(1)
-        item = " "
-        item.join(args)
+
+        item = " ".join(self.opts.args).strip() + "\n"
         print("Adding %s to %s"%(item, self.path))
         self.contents.append(item)
         self.__dump__()
 
-    def __del_obj__(self, args):
+    def __del_obj__(self):
         """
         Arguments:
-        - `args`:
         """
-        if not args:
-            print("Adding operation needs arguments, showing usage\n\n")
+        if not self.opts.args:
+            print("deleting operation needs arguments, showing usage\n\n")
             self.Help()
             sys.exit(1)
 
         pass
 
-    def __list_obj__(self, args):
+    def __list_obj__(self):
         """
         Arguments:
-        - `args`:
         """
         if not self.contents:
             print("No entries in %s\n"%self.path)
             sys.exit(1)
 
-        print("Listing %s contains: %s"%( self.path, " ".join(args) if args else "all item"))
-        if args:
+        print("Listing %s contains: %s"%( self.path, " ".join(self.opts.args) if self.opts.args else "all item"))
+        if self.opts.args:
             result=set()
             for entry in self.contents:
-                for item in args:
+                for item in self.opts.args:
                     if item in entry:
                         result.add(entry)
             if result:
@@ -204,14 +216,14 @@ class PortageObject(object):
 
         pass
 
-    def __clean_obj__(self, args):
+    def __clean_obj__(self):
         """
         Arguments:
         - `args`:
         """
         pass
 
-    def __usage__(self, args):
+    def __usage__(self):
         """
         Arguments:
         - `args`:
@@ -254,16 +266,16 @@ class UseRecord:
             result += " " + str(flag)
         return result
 
-    def merge(self, args):
+    def merge(self):
         for e in args:
             nflag = UseFlag(e)
             self._flags[nflag._use] = nflag
 
 class UsePortageObject(PortageObject):
-    def __init__(self, path):
+    def __init__(self, opts):
         """
         """
-        PortageObject.__init__(self, path)
+        PortageObject.__init__(self, opts)
         pass
 
     def __parse__(self):
@@ -273,7 +285,7 @@ class UsePortageObject(PortageObject):
             self.records[record._name] = record
         pass
 
-    def __add_obj__(self, args):
+    def __add_obj__(self):
         """
         Arguments:
         - `args`:
@@ -313,37 +325,40 @@ class DistPortageObject(PortageObject):
         PortageObject.__init__(self, path)
         pass
 
-    def __clean_obj(self, args):
+    def __clean_obj(self):
         """
         Arguments:
         - `args`:
         """
         pass
 
-
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description=desc, epilog=elog,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter,)
+    parser.add_argument('-a', '--add', metavar='OBJ',
+                        action=FooAction,
+                        choices=objs,
+                        help='add content to OBJECT')
+    parser.add_argument('-d', '--delete', metavar='OBJ',
+                        action=FooAction,
+                        choices=objs, help='delete content from an OBJECT')
+    parser.add_argument('-l', '--list', metavar='OBJ',
+                        action=FooAction,
+                        choices=objs, help='list content of an OBJECT')
+    # parser.add_argument('-c', '--clean', nargs='?')
+    parser.add_argument('args', nargs=argparse.REMAINDER, metavar='content',
+                        help='contents to be add/delete to OBJECT')
 
-    #TODO: Usage argparse to do the parsing.
-    args = sys.argv
-    if len(args) == 1:
-        usage()
-        sys.exit(1)
+    opts = parser.parse_args(sys.argv[1:])
 
-    app = args.pop(0)
-    commbo = args.pop(0)
-    if (not commbo.startswith('-')) or \
-        (len(commbo) != 2 and len(commbo) != 3):
-        usage()
-        sys.exit(1)
-
-    action = commbo[1]
-    target = None if len(commbo) == 2 else commbo[2]
-    executer = {
-        'u' : UsePortageObject,
-        None : DistPortageObject
-    }.get(target, PortageObject)(target)
-
-    executer.Action(action, args)
+    if opts.action != 'clean':
+        executer = {
+            'u' : UsePortageObject,
+            None : DistPortageObject
+        }.get(opts.target, PortageObject)(opts)
+        executer.Action()
+    else:
+        print("Clean is not implemented yet, you can try C version kmu instead...")
 
 # Editor modelines
 
