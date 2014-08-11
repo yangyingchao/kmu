@@ -48,11 +48,11 @@ To delete keyword entry which includes xxx
 '''
 objs=['k', 'm', 'u', 'U']
 
-class FooAction(argparse.Action):
+class KmuArgAction(argparse.Action):
     def __init__(self, option_strings, dest, nargs=None, **kwargs):
         if nargs is not None:
             raise ValueError("nargs not allowed")
-        super(FooAction, self).__init__(option_strings, dest, **kwargs)
+        super(KmuArgAction, self).__init__(option_strings, dest, **kwargs)
         pass
     def __call__(self, parser, namespace, values, option_string=None):
         if namespace.__dict__.get('action'):
@@ -63,6 +63,25 @@ class FooAction(argparse.Action):
 
         setattr(namespace, 'action', self.dest)
         setattr(namespace, 'target', values)
+
+class Record(object):
+    """Simple Record of entries.
+    """
+
+    def __init__(self, content):
+        """
+
+        Arguments:
+        - `content`:
+        """
+        self._content = content
+        self._name    = content
+        self._keep    = True
+
+    def __str__(self):
+        """
+        """
+        return "%s"%(self._content if self._keep else "")
 
 class PortageObject(object):
     """Generic object for portage files.
@@ -83,7 +102,6 @@ class PortageObject(object):
             #Used by gentoo prefix(MacOsX).
             self.path = os.path.join(os.getenv("EPREFIX"), self.path)
 
-        self.contents = []
         try:
             self.contents = open(self.path).readlines()
             self.__parse__()
@@ -114,6 +132,14 @@ class PortageObject(object):
     def __parse__(self):
         """
         """
+        self.records = {}
+        for content in self.contents:
+            content = content.strip()
+            if content.startswith('#'):
+                continue #skip comments.
+            record = Record(content)
+            self.records[record._name] = record
+
         pass
 
     def __get_portage_dir__(self):
@@ -158,7 +184,8 @@ class PortageObject(object):
             os.shutil.copy(dirn, dirn+"bakup")
             os.remove(dirn)
 
-        os.makedirs(dirn, exist_ok=True)
+        if not os.access(dirn, os.F_OK):
+            os.makedirs(dirn)
         try:
             open(self.path, "w").write(self.__str__())
         except IOError as e:
@@ -183,11 +210,28 @@ class PortageObject(object):
         """
         Arguments:
         """
-        if not self.opts.args:
+        args = self.opts.args
+        if not args:
             print("deleting operation needs arguments, showing usage\n\n")
             self.Help()
             sys.exit(1)
 
+        # todo:
+        operands = []
+        for item in args:
+            for record in self.records.values():
+                if record._content.find(item) != -1:
+                    record._keep = False
+                    operands.append(record)
+        if len(operands) > 1:
+            print("Going to delete multiple records: \n\t%s,\ncontinue?\n"%(
+                "\n\t".join(map(lambda X: X.__str__(), operands))))
+
+            if sys.stdin.readline().strip().lower() != 'y':
+                print("Operation aborted..\n")
+                sys.exit(1)
+
+        self.__dump__()
         pass
 
     def __list_obj__(self):
@@ -233,7 +277,7 @@ class PortageObject(object):
     def __str__(self):
         """
         """
-        return "".join(self.contents)
+        return "\n".join(map(lambda X: X.__str__(), self.records))
 
 
 class UseFlag:
@@ -251,8 +295,9 @@ class UseFlag:
     def __hash__(self):
         return hash(self._use)
 
-class UseRecord:
+class UseRecord(Record):
     def __init__(self, entry):
+        Record.__init__(self, entry)
         cmps = entry.split()
         self._name = cmps.pop(0);
         self._flags = {}
@@ -286,10 +331,7 @@ class UsePortageObject(PortageObject):
         pass
 
     def __add_obj__(self):
-        """
-        Arguments:
-        - `args`:
-        """
+        args = self.opts.args
         if not args or len(args) < 1:
             print("Adding operation needs arguments, showing usage\n\n")
             self.Help()
@@ -336,20 +378,30 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=desc, epilog=elog,
                                      formatter_class=argparse.RawDescriptionHelpFormatter,)
     parser.add_argument('-a', '--add', metavar='OBJ',
-                        action=FooAction,
+                        action=KmuArgAction,
                         choices=objs,
                         help='add content to OBJECT')
     parser.add_argument('-d', '--delete', metavar='OBJ',
-                        action=FooAction,
+                        action=KmuArgAction,
                         choices=objs, help='delete content from an OBJECT')
     parser.add_argument('-l', '--list', metavar='OBJ',
-                        action=FooAction,
+                        action=KmuArgAction,
                         choices=objs, help='list content of an OBJECT')
     # parser.add_argument('-c', '--clean', nargs='?')
     parser.add_argument('args', nargs=argparse.REMAINDER, metavar='content',
                         help='contents to be add/delete to OBJECT')
 
+    if len(sys.argv) == 1:
+        print("Missing arguments, showing help..\n")
+        parser.print_help()
+        sys.exit(1)
+
     opts = parser.parse_args(sys.argv[1:])
+    if not opts.target and opts.action != 'clean':
+        print("Wrong usage, showing help...\n")
+        parser.print_help()
+        sys.exit(1)
+
 
     executer = {
         'u' : UsePortageObject,
