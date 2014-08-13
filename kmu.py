@@ -46,12 +46,10 @@ To add a keyword into /etc/portage/package.keyword:
 To delete keyword entry which includes xxx
 	kmu -du xxx
 '''
-objs=['k', 'm', 'u', 'U']
+objs=['k', 'm', 'u', 'U', 'p']
 
 class KmuArgAction(argparse.Action):
-    def __init__(self, option_strings, dest, nargs=None, **kwargs):
-        if nargs is not None:
-            raise ValueError("nargs not allowed")
+    def __init__(self, option_strings, dest, **kwargs):
         super(KmuArgAction, self).__init__(option_strings, dest, **kwargs)
         pass
     def __call__(self, parser, namespace, values, option_string=None):
@@ -60,6 +58,9 @@ class KmuArgAction(argparse.Action):
                 self.dest, getattr(namespace, 'action')))
             parser.print_help()
             sys.exit(1)
+
+        if self.dest == 'clean' and values is None:
+            values = 'p'
 
         setattr(namespace, 'action', self.dest)
         setattr(namespace, 'target', values)
@@ -95,6 +96,7 @@ class PortageObject(object):
             'm': "/etc/portage/package.mask/mask",
             'u': "/etc/portage/package.use/use",
             'U': "/etc/portage/package.unmask/unmask",
+            'p': '/usr/portage/distfiles',
             None: '/usr/portage/distfiles'
             }.get(opts.target, None)
 
@@ -365,13 +367,19 @@ class DistPortageObject(PortageObject):
         """
         """
         PortageObject.__init__(self, path)
+        for root, dirs, files in os.walk(self.path):
+            for fn in files:
+                fpath = os.path.join(root, fn)
+                print("File: %s, size: %d\n"%(fpath, os.path.getsize(fpath)))
+                #todo: define objects to represent package.
         pass
 
-    def __clean_obj(self):
+    def __clean_obj__(self):
         """
         Arguments:
         - `args`:
         """
+
         pass
 
 if __name__ == '__main__':
@@ -387,7 +395,11 @@ if __name__ == '__main__':
     parser.add_argument('-l', '--list', metavar='OBJ',
                         action=KmuArgAction,
                         choices=objs, help='list content of an OBJECT')
-    # parser.add_argument('-c', '--clean', nargs='?')
+    parser.add_argument('-c', '--clean',
+                        action=KmuArgAction, nargs='?',
+                        choices=objs, help='clean up content')
+    # parser.add_argument('-c', '--clean', dest='action', const='clean',
+    #                     action='store_const', help='clean up content')
     parser.add_argument('args', nargs=argparse.REMAINDER, metavar='content',
                         help='contents to be add/delete to OBJECT')
 
@@ -397,7 +409,8 @@ if __name__ == '__main__':
         sys.exit(1)
 
     opts = parser.parse_args(sys.argv[1:])
-    if not opts.target and opts.action != 'clean':
+
+    if not opts.__dict__.get('target') and opts.action != 'clean':
         print("Wrong usage, showing help...\n")
         parser.print_help()
         sys.exit(1)
@@ -405,6 +418,7 @@ if __name__ == '__main__':
 
     executer = {
         'u' : UsePortageObject,
+        'p' : DistPortageObject,
         None : DistPortageObject
         }.get(opts.target, PortageObject)(opts)
     executer.Action()
