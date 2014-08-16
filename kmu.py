@@ -29,6 +29,7 @@ import sys
 import glob
 import shutil
 import argparse
+import re
 
 desc = '''Simple tool to manager keyword/(un)mask/use for Gentoo'''
 elog = '''
@@ -83,6 +84,101 @@ class Record(object):
         """
         """
         return "%s"%(self._content if self._keep else "")
+
+r = re.compile('(.+)?(?:[-_]((?:\d+\.)+))')
+class PackageRecord(Record):
+    """
+    """
+
+    def __init__(self, content):
+        """
+        """
+        super(PackageRecord, self).__init__(content)
+        self._fpath = content
+        self._bname = os.path.basename(content)
+        self._siblings = []
+        self._size = os.path.getsize(content)
+        self._delete = False
+        global r
+        res = r.match(self._bname)
+        if res and content.find("_checksum_failure_") == -1:
+            self._key = res.group(1)
+            self._v   = res.group(2).strip('.')
+        else:
+            self._key = "CLEAN_XXX"
+            self._delete = True # flag to delete
+
+    def __str__(self):
+        """
+        """
+        return self._fpath;
+
+    def __lt__(self, other):
+        """
+
+        Arguments:
+
+        - `other`:
+        """
+        vs1 = self._v.split('.')
+        vs2 = other._v.split('.')
+
+        lc = len(vs1)
+        lo = len(vs2)
+        for i in range(max(lc, lo)):
+            if i >= lc:
+                return True
+            elif i >= lo:
+                return False
+            else:
+                l = int(vs1[i])
+                o = int(vs2[i])
+                if l == o:
+                    continue
+                return l < o
+        return False
+
+class PackageContainer(object):
+    """
+    """
+
+    def __init__(self, p):
+        """
+        """
+        self._current  = None
+        if not p._delete:
+            self._current  = p
+            self._del_list = []
+        else:
+            self._del_list = [p]
+        pass
+
+    def AddPackage(self, p):
+        """
+        Add package into this container..
+        """
+        if not p._delete:
+            if p < self._current:
+                self._del_list.append(p)
+            else:
+                self._del_list.append(self._current)
+                self._current = p
+        else:
+            self._del_list.append(p)
+
+    def ClearOldOnes(self, idx):
+        """
+        """
+        lst = []
+        sz  = 0
+        for item in self._del_list:
+            sz += item._size
+            lst.append(item._fpath)
+
+        if lst:
+            print("\t%03d\tKEEP:\t%s"%(idx, self._current))
+            print("\t\tDEL:\t%s\n"%("\n\t\t\t".join(lst)))
+        return (lst, sz)
 
 class PortageObject(object):
     """Generic object for portage files.
@@ -313,7 +409,7 @@ class UseRecord(Record):
             result += " " + str(flag)
         return result
 
-    def merge(self):
+    def merge(self, args):
         for e in args:
             nflag = UseFlag(e)
             self._flags[nflag._use] = nflag
@@ -358,6 +454,17 @@ class UsePortageObject(PortageObject):
             result += str(record) + "\n"
         return result
 
+def stringify_size(s):
+    P = 1024
+    if s < P:
+        return "%d bytes"%s
+    OP = P
+    P *= 1024
+    if s < P:
+        return "%d KB"%(s/OP)
+    else:
+        return "%.02f MB"%(float(s)/P)
+
 
 class DistPortageObject(PortageObject):
     """
@@ -367,11 +474,19 @@ class DistPortageObject(PortageObject):
         """
         """
         PortageObject.__init__(self, path)
+        self._packages = {}
         for root, dirs, files in os.walk(self.path):
             for fn in files:
                 fpath = os.path.join(root, fn)
-                print("File: %s, size: %d\n"%(fpath, os.path.getsize(fpath)))
-                #todo: define objects to represent package.
+                print("%s\n"%(fpath))
+
+                p = PackageRecord(fpath)
+                pc = self._packages.get(p._key)
+                if pc is None:
+                    pc = PackageContainer(p)
+                    self._packages[p._key] = pc
+                else:
+                    pc.AddPackage(p)
         pass
 
     def __clean_obj__(self):
@@ -379,8 +494,29 @@ class DistPortageObject(PortageObject):
         Arguments:
         - `args`:
         """
+        f_size  = 0
+        f_list  = []
+        idx = 0
 
-        pass
+        print("Checking old packages....\n")
+
+        for pc in self._packages.values():
+            (lst, sz) = pc.ClearOldOnes(idx)
+            f_list.extend(lst)
+            f_size += sz
+            idx += 1
+        if f_list:
+            print("\nTotal %d items, size %s:\n"%(len(f_list), stringify_size(f_size)))
+            print("Continue? (Y/N)\n")
+
+            if sys.stdin.readline().strip().lower() != 'y':
+                print("Operation aborted..\n")
+
+            for item in f_list:
+                os.remove(item)
+        else:
+            print("No old package detected...\n")
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=desc, epilog=elog,
@@ -398,8 +534,6 @@ if __name__ == '__main__':
     parser.add_argument('-c', '--clean',
                         action=KmuArgAction, nargs='?',
                         choices=objs, help='clean up content')
-    # parser.add_argument('-c', '--clean', dest='action', const='clean',
-    #                     action='store_const', help='clean up content')
     parser.add_argument('args', nargs=argparse.REMAINDER, metavar='content',
                         help='contents to be add/delete to OBJECT')
 
