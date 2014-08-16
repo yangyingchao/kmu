@@ -85,7 +85,7 @@ class Record(object):
         """
         return "%s"%(self._content if self._keep else "")
 
-r = re.compile('(.+)?(?:[-_]((?:\d+\.)+))')
+r = re.compile('(.+?)(?:[-_]((?:\d+[\.\-_])+))')
 class PackageRecord(Record):
     """
     """
@@ -99,14 +99,21 @@ class PackageRecord(Record):
         self._siblings = []
         self._size = os.path.getsize(content)
         self._delete = False
-        global r
-        res = r.match(self._bname)
-        if res and content.find("_checksum_failure_") == -1:
-            self._key = res.group(1)
-            self._v   = res.group(2).strip('.')
+        if content.find("_checksum_failure_") != -1:
+            self._key = "Temporary Files"
+            self._delete = True
+        elif content.find("patch") != -1:
+            self._key = "Patches"
+            self._delete = True
         else:
-            self._key = "CLEAN_XXX"
-            self._delete = True # flag to delete
+            global r
+            res = r.match(self._bname)
+            if res:
+                self._key = res.group(1)
+                self._v   = res.group(2).replace('-', '.').replace('_', '.').strip('.')
+            else:
+                self._key = "Unrecognized Files."
+                self._delete = True # flag to delete
 
     def __str__(self):
         """
@@ -125,6 +132,7 @@ class PackageRecord(Record):
 
         lc = len(vs1)
         lo = len(vs2)
+
         for i in range(max(lc, lo)):
             if i >= lc:
                 return True
@@ -145,11 +153,12 @@ class PackageContainer(object):
     def __init__(self, p):
         """
         """
-        self._current  = None
+        self._label = p._key
         if not p._delete:
             self._current  = p
             self._del_list = []
         else:
+            self._current = None
             self._del_list = [p]
         pass
 
@@ -176,8 +185,9 @@ class PackageContainer(object):
             lst.append(item._fpath)
 
         if lst:
-            print("\t%03d\tKEEP:\t%s"%(idx, self._current))
-            print("\t\tDEL:\t%s\n"%("\n\t\t\t".join(lst)))
+            print(" %03d: %s"%(idx, self._label))
+            print("   KEEP: %s"%self._current)
+            print("   DEL : %s\n"%("\n         ".join(lst)))
         return (lst, sz)
 
 class PortageObject(object):
@@ -478,8 +488,6 @@ class DistPortageObject(PortageObject):
         for root, dirs, files in os.walk(self.path):
             for fn in files:
                 fpath = os.path.join(root, fn)
-                print("%s\n"%(fpath))
-
                 p = PackageRecord(fpath)
                 pc = self._packages.get(p._key)
                 if pc is None:
@@ -504,16 +512,24 @@ class DistPortageObject(PortageObject):
             (lst, sz) = pc.ClearOldOnes(idx)
             f_list.extend(lst)
             f_size += sz
-            idx += 1
+            if lst:
+                idx += 1
+
         if f_list:
-            print("\nTotal %d items, size %s:\n"%(len(f_list), stringify_size(f_size)))
+            print("\nGoing to deleted %d files,  %s disk spaces will be freed.\n"%(
+                len(f_list), stringify_size(f_size)))
             print("Continue? (Y/N)\n")
 
             if sys.stdin.readline().strip().lower() != 'y':
                 print("Operation aborted..\n")
 
-            for item in f_list:
-                os.remove(item)
+            try:
+                for item in f_list:
+                    os.remove(item)
+            except:
+                print("Failed to remove files: %s\n"%(sys.exc_info()))
+            else:
+                print("Finished in cleaning packages...\n")
         else:
             print("No old package detected...\n")
 
