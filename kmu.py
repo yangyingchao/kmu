@@ -102,7 +102,7 @@ class PackageRecord(Record):
         if content.find("_checksum_failure_") != -1:
             self._key = "Temporary Files"
             self._delete = True
-        elif content.find("patch") != -1:
+        elif content.find("patch") != -1 or content.find("diff") != -1:
             self._key = "Patches"
             self._delete = True
         else:
