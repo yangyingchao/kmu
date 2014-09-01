@@ -527,7 +527,7 @@ class DistPortageObject(PortageObject):
                 for item in f_list:
                     os.remove(item)
             except:
-                print("Failed to remove files: %s\n"%(sys.exc_info()))
+                print("Failed to remove files: %s\n"%(sys.exc_info()[1]))
             else:
                 print("Finished in cleaning packages...\n")
         else:
