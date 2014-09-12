@@ -212,9 +212,9 @@ class PortageObject(object):
 
         try:
             self.contents = open(self.path).readlines()
-            self.__parse__()
         except :
             self.contents=[]
+        self.__parse__()
 
     def Help(self):
         """
@@ -234,8 +234,7 @@ class PortageObject(object):
     def __str__(self):
         """
         """
-        sep=""
-        return sep.join(self.contents)
+        return "".join(self.contents)
 
     def __parse__(self):
         """
@@ -247,7 +246,6 @@ class PortageObject(object):
                 continue #skip comments.
             record = Record(content)
             self.records[record._name] = record
-
         pass
 
     def __get_portage_dir__(self):
@@ -312,6 +310,8 @@ class PortageObject(object):
         item = " ".join(self.opts.args).strip() + "\n"
         print("Adding %s to %s"%(item, self.path))
         self.contents.append(item)
+        record = Record(item)
+        self.records[record._name] = record
         self.__dump__()
 
     def __del_obj__(self):
