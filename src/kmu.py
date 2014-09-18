@@ -231,11 +231,6 @@ class PortageObject(object):
                   lambda x : parser.print_help())()
         pass
 
-    def __str__(self):
-        """
-        """
-        return "".join(self.contents)
-
     def __parse__(self):
         """
         """
@@ -284,19 +279,35 @@ class PortageObject(object):
             print("Can't decide where to write files.!")
             sys.exit(1)
 
+        tmpFile=None
         dirn = os.path.dirname(self.path)
         if os.path.exists(dirn) and not os.path.isdir(dirn):
             self.__merge_from_file(dirn)
-            os.shutil.copy(dirn, dirn+"bakup")
-            os.remove(dirn)
+            tmpFile = dirn+".bakup"
+            shutil.move(dirn, tmpFile)
 
         if not os.access(dirn, os.F_OK):
             os.makedirs(dirn)
         try:
-            open(self.path, "w").write(self.__str__())
+            open(self.path, "w").write(self.__str__() + "\n")
         except IOError as e:
+            if tmpFile: # restore previous structure.
+                shutil.move(tmpFile, dirn)
             print("failed to write to file: %s, reason: %s.\n"%(self.path, e.strerror))
             sys.exit(2)
+        else:
+            if tmpFile:
+                os.remove(tmpFile)
+
+    def __merge_from_file(self, path):
+        """Merge content from path.
+        """
+        for content in open(path).readlines():
+            content = content.strip()
+            if content.startswith('#'):
+                continue #skip comments.
+            record = Record(content)
+            self.records[record._name] = record
 
     def __add_obj__(self):
         """
@@ -330,7 +341,7 @@ class PortageObject(object):
             for record in self.records.values():
                 if record._content.find(item) != -1:
                     record._keep = False
-                    operands.append(record)
+                    operands.append(record._name)
         if len(operands) > 1:
             print("Going to delete multiple records: \n\t%s,\ncontinue?\n"%(
                 "\n\t".join(map(lambda X: X.__str__(), operands))))
@@ -385,7 +396,7 @@ class PortageObject(object):
     def __str__(self):
         """
         """
-        return "\n".join(map(lambda X: X.__str__(), self.records))
+        return "\n".join(map(lambda X: X.__str__(), self.records.values()))
 
 
 class UseFlag:
