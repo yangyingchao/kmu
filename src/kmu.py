@@ -49,6 +49,23 @@ To delete keyword entry which includes xxx
 '''
 objs=['k', 'm', 'u', 'U', 'p']
 
+def GetFileContent(path, filterEmptyLine=True):
+    """
+    Read file content.
+    Arguments:
+    - `path`: path of file
+    - `filterEmptyLine`: filter empty lines or not.
+    """
+    try:
+        contents = open(path, "r").readlines()
+    except:
+        return []
+
+    if filterEmptyLine:
+        return [x for x in contents if len(x.strip())!=0]
+    else:
+        return contents
+
 class KmuArgAction(argparse.Action):
     def __init__(self, option_strings, dest, **kwargs):
         super(KmuArgAction, self).__init__(option_strings, dest, **kwargs)
@@ -211,7 +228,7 @@ class PortageObject(object):
             self.path = os.path.join(os.getenv("EPREFIX"), self.path)
 
         try:
-            self.contents = open(self.path).readlines()
+            self.contents = GetFileContent(self.path)
         except :
             self.contents=[]
         self.__parse__()
@@ -302,7 +319,7 @@ class PortageObject(object):
     def __merge_from_file(self, path):
         """Merge content from path.
         """
-        for content in open(path).readlines():
+        for content in GetFileContent(path):
             content = content.strip()
             if content.startswith('#'):
                 continue #skip comments.
@@ -357,6 +374,8 @@ class PortageObject(object):
         """
         Arguments:
         """
+        #TODO: here we used contents instead of parsed records, may need to
+        #      switch to records if necessary...
         if not self.contents:
             print("No entries in %s\n"%self.path)
             sys.exit(1)
@@ -374,9 +393,11 @@ class PortageObject(object):
             else:
                 print("\n No entry found.\n")
         else:
-            item = ""
-            print(item.join(self.contents))
-
+            if self.contents:
+                print("\nTotal %d entries found, as follows\n\n%s\n"%(
+                    len(self.contents), "".join(self.contents)))
+            else:
+                print("\n No entry found...\n")
         pass
 
     def __clean_obj__(self):
@@ -396,7 +417,8 @@ class PortageObject(object):
     def __str__(self):
         """
         """
-        return "\n".join(map(lambda X: X.__str__(), self.records.values()))
+        return "\n".join(map(lambda X: X.__str__(),
+                             self.records.values())).strip()+"\n"
 
 
 class UseFlag:
