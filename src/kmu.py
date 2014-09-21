@@ -30,6 +30,7 @@ import glob
 import shutil
 import argparse
 import re
+import traceback
 
 desc = '''Simple tool to manager keyword/(un)mask/use for Gentoo'''
 elog = '''
@@ -49,6 +50,9 @@ To delete keyword entry which includes xxx
 '''
 objs=['k', 'm', 'u', 'U', 'p']
 
+opts = None
+
+# Utility functions..
 def GetFileContent(path, filterEmptyLine=True):
     """
     Read file content.
@@ -65,6 +69,15 @@ def GetFileContent(path, filterEmptyLine=True):
         return [x for x in contents if len(x.strip())!=0]
     else:
         return contents
+
+def DebugLog(args):
+    """
+
+    Arguments:
+    - `args`:
+    """
+    stack = traceback.extract_stack(None, 2)[0]
+    print("DEBUG - (%s:%d -- %s): %s"%(stack[0], stack[1], stack[2], args))
 
 class KmuArgAction(argparse.Action):
     def __init__(self, option_strings, dest, **kwargs):
@@ -210,10 +223,9 @@ class PackageContainer(object):
 class PortageObject(object):
     """Generic object for portage files.
     """
-    def __init__(self, opts):
+    def __init__(self):
         """
         """
-        self.opts   = opts
         self.path   = {
             'k': "/etc/portage/package.keywords/keywords",
             'm': "/etc/portage/package.mask/mask",
@@ -244,7 +256,7 @@ class PortageObject(object):
             'delete' : self.__del_obj__,
             'list' : self.__list_obj__,
             'clean' : self.__clean_obj__,
-            }.get(self.opts.action,
+            }.get(opts.action,
                   lambda x : parser.print_help())()
         pass
 
@@ -330,12 +342,12 @@ class PortageObject(object):
         """
         Arguments:
         """
-        if not self.opts.args:
+        if not opts.args:
             print("Adding operation needs arguments, showing usage\n\n")
             self.Help()
             sys.exit(1)
 
-        item = " ".join(self.opts.args).strip() + "\n"
+        item = " ".join(opts.args).strip() + "\n"
         print("Adding %s to %s"%(item, self.path))
         self.contents.append(item)
         record = Record(item)
@@ -346,7 +358,7 @@ class PortageObject(object):
         """
         Arguments:
         """
-        args = self.opts.args
+        args = opts.args
         if not args:
             print("deleting operation needs arguments, showing usage\n\n")
             self.Help()
@@ -360,7 +372,7 @@ class PortageObject(object):
                     record._keep = False
                     operands.append(record._name)
         if len(operands) > 1:
-            print("Going to delete multiple records: \n\t%s,\ncontinue?\n"%(
+            print("Going to delete multiple records: \n\t%s,\ncontinue? [Y/N]"%(
                 "\n\t".join(map(lambda X: X.__str__(), operands))))
 
             if sys.stdin.readline().strip().lower() != 'y':
@@ -380,11 +392,12 @@ class PortageObject(object):
             print("No entries in %s\n"%self.path)
             sys.exit(1)
 
-        print("Listing %s contains: %s"%( self.path, " ".join(self.opts.args) if self.opts.args else "all item"))
-        if self.opts.args:
+        print("Listing %s contains: %s"%(self.path, " ".join(opts.args)
+                                         if opts.args else "all item"))
+        if opts.args:
             result=set()
             for entry in self.contents:
-                for item in self.opts.args:
+                for item in opts.args:
                     if item in entry:
                         result.add(entry)
             if result:
@@ -426,9 +439,14 @@ class UseFlag:
         if record.startswith('-'):
             self._use = record[1:]
             self._sign   = '-'
-        else:
-            self._use = record
-            self._sign   = ''
+            return
+
+        if record.startswith('+'):
+            record = record[1:]
+
+        self._use = record
+        self._sign   = ''
+
 
     def __str__(self):
         return self._sign+self._use
@@ -447,21 +465,26 @@ class UseRecord(Record):
             self._flags[flag._use] = flag
 
     def __str__(self):
-        result = self._name
-        for flag in self._flags.values():
-            result += " " + str(flag)
-        return result
+        if self._keep:
+            result = self._name
+            for flag in self._flags.values():
+                result += " " + str(flag)
+            return result
+        return ""
 
     def merge(self, args):
+
+        DebugLog("Merging USE for %s: %s -- %s\n"%(
+            self._name, self._flags.values(), args))
         for e in args:
             nflag = UseFlag(e)
             self._flags[nflag._use] = nflag
 
 class UsePortageObject(PortageObject):
-    def __init__(self, opts):
+    def __init__(self):
         """
         """
-        PortageObject.__init__(self, opts)
+        PortageObject.__init__(self)
         pass
 
     def __parse__(self):
@@ -472,12 +495,15 @@ class UsePortageObject(PortageObject):
         pass
 
     def __add_obj__(self):
-        args = self.opts.args
+        args = opts.args
         if not args or len(args) < 1:
             print("Adding operation needs arguments, showing usage\n\n")
             self.Help()
             sys.exit(1)
-        print(self.__str__())
+
+        # if only one element in args, user may surrounded arguments using '"'...
+        if len(args) == 1:
+            args = args[0].split()
 
         # Check if use entry exists in self.records, merge it if exists!
         record = self.records.pop(args[0], None)
@@ -488,8 +514,7 @@ class UsePortageObject(PortageObject):
         self.records[record._name] = record
 
         self.__dump__()
-        print(self.__str__())
-
+        print("Record saved..:\n\t%s \n"%record)
 
     def __str__(self):
         result = ""
@@ -583,6 +608,10 @@ if __name__ == '__main__':
     parser.add_argument('-c', '--clean',
                         action=KmuArgAction, nargs='?',
                         choices=objs, help='clean up content')
+    parser.add_argument('-D', '--debug',
+                        action="store_true",
+                        help='clean up content')
+
     parser.add_argument('args', nargs=argparse.REMAINDER, metavar='content',
                         help='contents to be add/delete to OBJECT')
 
@@ -598,12 +627,11 @@ if __name__ == '__main__':
         parser.print_help()
         sys.exit(1)
 
-
     executer = {
         'u' : UsePortageObject,
         'p' : DistPortageObject,
         None : DistPortageObject
-        }.get(opts.target, PortageObject)(opts)
+        }.get(opts.target, PortageObject)()
     executer.Action()
 
 # Editor modelines
