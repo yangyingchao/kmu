@@ -76,8 +76,9 @@ def DebugLog(args):
     Arguments:
     - `args`:
     """
-    stack = traceback.extract_stack(None, 2)[0]
-    print("DEBUG - (%s:%d -- %s): %s"%(stack[0], stack[1], stack[2], args))
+    if opts.debug:
+        stack = traceback.extract_stack(None, 2)[0]
+        print("DEBUG - (%s:%d -- %s): %s"%(stack[0], stack[1], stack[2], args))
 
 class KmuArgAction(argparse.Action):
     def __init__(self, option_strings, dest, **kwargs):
