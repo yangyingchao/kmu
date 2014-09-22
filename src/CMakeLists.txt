@@ -1,7 +1,9 @@
 if(PYTHON)
-  add_executable(ckmu main.c util.c)
-  install(TARGETS ckmu
-    RUNTIME DESTINATION bin)
+  if(BUILD_CKMU)
+    add_executable(ckmu main.c util.c)
+    install(TARGETS ckmu
+      RUNTIME DESTINATION bin)
+  endif(BUILD_CKMU)
   install(PROGRAMS kmu.py DESTINATION bin
     RENAME kmu)
 else(PYTHON)

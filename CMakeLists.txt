@@ -5,6 +5,10 @@ option (PYTHON
   "Use kmu of python version"
   ON)
 
+option (BUILD_CKMU
+  "Build KMU of c version too"
+  OFF)
+
 set(CMAKE_INSTALL_PREFIX "/usr")
 
 # uninstall target
