@@ -539,10 +539,10 @@ class DistPortageObject(PortageObject):
     """
     """
 
-    def __init__(self, path):
+    def __init__(self):
         """
         """
-        PortageObject.__init__(self, path)
+        PortageObject.__init__(self)
         self._packages = {}
         for root, dirs, files in os.walk(self.path):
             for fn in files:
@@ -627,6 +627,8 @@ if __name__ == '__main__':
         print("Wrong usage, showing help...\n")
         parser.print_help()
         sys.exit(1)
+
+    print("%s"%opts)
 
     executer = {
         'u' : UsePortageObject,
