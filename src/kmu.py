@@ -35,10 +35,11 @@ import traceback
 desc = '''Simple tool to manager keyword/(un)mask/use for Gentoo'''
 elog = '''
 Where OBJECT could be one of the following:
-k, keyword: Accept a new keyword specified by package_string
-m, mask: 	mask a new keyword specified by package_string
-u, use: 	Modify or add new use to package_string
-U, Umask: 	Unmask a package
+k,  keyword: Accept a new keyword specified by package_string
+m,  mask: 	mask a new keyword specified by package_string
+u,  use: 	Modify or add new use to package_string
+uL, Linguas: of USE.
+U,  Umask: 	Unmask a package
 
 ****** Examples: ******
 To list all keywords stored in /etc/portage/package.keyword:
@@ -47,10 +48,27 @@ To add a keyword into /etc/portage/package.keyword:
 	kmu -ak
 To delete keyword entry which includes xxx
 	kmu -du xxx
+To remove zh_CN linguas for man-pages
+	kmu -auL sys-apps/man-pages -zh_CN
 '''
-objs=['k', 'm', 'u', 'U', 'p']
+objs=['k', 'm', 'u', 'U', 'p', 'uL']
 
 opts = None
+
+def PDEBUG(fmt, *args):
+    """
+    Utility to show debug logs.
+    """
+    if not opts.debug:
+        return
+
+    stack = traceback.extract_stack(None, 2)[0]
+    try:
+        msg = fmt%args
+    except:
+        msg = "Failed to format string.."
+    finally:
+        print("DEBUG - (%s:%d -- %s): %s"%(stack[0], stack[1], stack[2], msg))
 
 # Utility functions..
 def GetFileContent(path, filterEmptyLine=True):
@@ -69,16 +87,6 @@ def GetFileContent(path, filterEmptyLine=True):
         return [x for x in contents if len(x.strip())!=0]
     else:
         return contents
-
-def DebugLog(args):
-    """
-
-    Arguments:
-    - `args`:
-    """
-    if opts.debug:
-        stack = traceback.extract_stack(None, 2)[0]
-        print("DEBUG - (%s:%d -- %s): %s"%(stack[0], stack[1], stack[2], args))
 
 class KmuArgAction(argparse.Action):
     def __init__(self, option_strings, dest, **kwargs):
@@ -117,6 +125,7 @@ class Record(object):
         return "%s"%(self._content if self._keep else "")
 
 r = re.compile('(.+?)(?:[-_]((?:\d+[\.\-_])+))')
+
 class PackageRecord(Record):
     """
     """
@@ -231,6 +240,7 @@ class PortageObject(object):
             'k': "/etc/portage/package.keywords/keywords",
             'm': "/etc/portage/package.mask/mask",
             'u': "/etc/portage/package.use/use",
+            'uL': "/etc/portage/package.use/use",
             'U': "/etc/portage/package.unmask/unmask",
             'p': '/usr/portage/distfiles',
             None: '/usr/portage/distfiles'
@@ -251,7 +261,7 @@ class PortageObject(object):
         """
         parser.print_help()
 
-    def Action(self):
+    def Execute(self):
         func = {
             'add' : self.__add_obj__,
             'delete' : self.__del_obj__,
@@ -379,6 +389,8 @@ class PortageObject(object):
             if sys.stdin.readline().strip().lower() != 'y':
                 print("Operation aborted..\n")
                 sys.exit(1)
+        else:
+            print("Deleted item: %s\n"%(operands))
 
         self.__dump__()
         pass
@@ -475,7 +487,7 @@ class UseRecord(Record):
 
     def merge(self, args):
 
-        DebugLog("Merging USE for %s: %s -- %s\n"%(
+        PDEBUG("Merging USE for %s: %s -- %s\n"%(
             self._name, self._flags.values(), args))
         for e in args:
             nflag = UseFlag(e)
@@ -533,6 +545,79 @@ def stringify_size(s):
         return "%d KB"%(s/OP)
     else:
         return "%.02f MB"%(float(s)/P)
+
+
+class LinguasUsePortageObject(UsePortageObject):
+    def __init__(self):
+        """
+        """
+        UsePortageObject.__init__(self)
+        pass
+
+    def __add_obj__(self):
+        args = opts.args
+        if not args or len(args) < 1:
+            print("Adding operation needs arguments, showing usage\n\n")
+            self.Help()
+            sys.exit(1)
+
+        # if only one element in args, user may surrounded arguments using '"'...
+        if len(args) == 1:
+            args = args[0].split()
+
+        pkg = args[0]
+        linguas = []
+        for item in args[1:]:
+            if item.startswith('-'):
+                linguas.append('-linguas_%s'%item[1:])
+            else:
+                linguas.append('linguas_%s'%item)
+
+        # Check if use entry exists in self.records, merge it if exists!
+        record = self.records.pop(pkg, None)
+        if record is None:
+            record = UseRecord(pkg + " " + " ".join(linguas))
+        else:
+            record.merge(linguas)
+        PDEBUG ("Linguas: %s, Package: %s, Full: %s", linguas, pkg, record);
+        self.records[record._name] = record
+
+        self.__dump__()
+
+        print("Record saved..:\n\t%s \n"%record)
+
+    def __list_obj__(self):
+        """
+        Arguments:
+        """
+        if not self.contents:
+            print("No entries in %s\n"%self.path)
+            sys.exit(1)
+
+        print("Listing %s for Linguas contains: %s\n"%(
+            self.path, " ".join(opts.args) if opts.args else "all item\n"))
+        result=[]
+        if opts.args:
+            for entry in self.contents:
+                for item in opts.args:
+                    if item in entry:
+                        result.append(entry)
+        else:
+            result = self.contents
+
+        PDEBUG ("total entries: %d\n", len(result));
+
+        count = 0
+        for item in result:
+            if 'linguas' in item:
+                print("\t%s\n"%(item))
+                count += 1
+
+        if count == 0 :
+            print("No item found..\n")
+        else:
+            print("Total %d items found..\n"%(count))
+        return
 
 
 class DistPortageObject(PortageObject):
@@ -612,6 +697,10 @@ if __name__ == '__main__':
     parser.add_argument('-D', '--debug',
                         action="store_true",
                         help='clean up content')
+    parser.add_argument('-v', '--version',
+                        action="version",
+                        version="@VERSION_MAJOR@.@VERSION_MINOR@.@VERSION_PATCH@",
+                        help='clean up content')
 
     parser.add_argument('args', nargs=argparse.REMAINDER, metavar='content',
                         help='contents to be add/delete to OBJECT')
@@ -628,14 +717,13 @@ if __name__ == '__main__':
         parser.print_help()
         sys.exit(1)
 
-    print("%s"%opts)
-
     executer = {
         'u' : UsePortageObject,
+        'uL': LinguasUsePortageObject,
         'p' : DistPortageObject,
         None : DistPortageObject
         }.get(opts.target, PortageObject)()
-    executer.Action()
+    executer.Execute()
 
 # Editor modelines
 
