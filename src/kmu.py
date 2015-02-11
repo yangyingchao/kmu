@@ -20,6 +20,7 @@
 ##
 ## Description:   simple utility to manager keyword, use and masks.
 ##
+## TODO:
 ##
 #####################################################################
 # -*- coding: utf-8 -*-
@@ -493,7 +494,7 @@ class UseRecord(Record):
             nflag = UseFlag(e)
             self._flags[nflag._use] = nflag
 
-class UsePortageObject(PortageObject):
+class UsesObject(PortageObject):
     def __init__(self):
         """
         """
@@ -535,6 +536,38 @@ class UsePortageObject(PortageObject):
             result += str(record) + "\n"
         return result
 
+class KeywordsObject(PortageObject):
+    def __init__(self):
+        """
+        """
+        PDEBUG ("called...");
+        PortageObject.__init__(self)
+        pass
+
+    def __add_obj__(self):
+        args = opts.args
+        PDEBUG ("Adding %s", args);
+        if not args or len(args) < 1:
+            print("Adding operation needs arguments, showing usage\n\n")
+            self.Help()
+            sys.exit(1)
+
+        # if only one element in args, user may surrounded arguments using '"'...
+        if len(args) == 1:
+            args = args[0].split()
+
+        if len(args) == 1: # ok, I'll add "*" for you..
+            args.append("**")
+
+        item = " ".join(args).strip() + "\n"
+        print("Adding keyword %s to %s"%(item, self.path))
+        self.contents.append(item)
+        record = Record(item)
+        self.records[record._name] = record
+        self.__dump__()
+
+        print("Record saved..:\n\t%s \n"%record)
+
 def stringify_size(s):
     P = 1024
     if s < P:
@@ -547,11 +580,11 @@ def stringify_size(s):
         return "%.02f MB"%(float(s)/P)
 
 
-class LinguasUsePortageObject(UsePortageObject):
+class LinguasObject(UsesObject):
     def __init__(self):
         """
         """
-        UsePortageObject.__init__(self)
+        UsesObject.__init__(self)
         pass
 
     def __add_obj__(self):
@@ -677,7 +710,6 @@ class DistPortageObject(PortageObject):
         else:
             print("No old package detected...\n")
 
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=desc, epilog=elog,
                                      formatter_class=argparse.RawDescriptionHelpFormatter,)
@@ -718,8 +750,9 @@ if __name__ == '__main__':
         sys.exit(1)
 
     executer = {
-        'u' : UsePortageObject,
-        'uL': LinguasUsePortageObject,
+        'k' : KeywordsObject,
+        'u' : UsesObject,
+        'uL': LinguasObject,
         'p' : DistPortageObject,
         None : DistPortageObject
         }.get(opts.target, PortageObject)()
