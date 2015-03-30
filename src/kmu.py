@@ -697,8 +697,13 @@ class DistPortageObject(PortageObject):
                 len(f_list), stringify_size(f_size)))
             print("Continue? (Y/N)\n")
 
-            if sys.stdin.readline().strip().lower() != 'y':
-                print("Operation aborted..\n")
+            try:
+                if sys.stdin.readline().strip().lower() != 'y':
+                    print("Operation aborted..\n")
+
+            except KeyboardInterrupt as e:
+                print("\n\nAbort...\n")
+                sys.exit(1)
 
             try:
                 for item in f_list:
