@@ -71,6 +71,25 @@ def PDEBUG(fmt, *args):
     finally:
         print("DEBUG - (%s:%d -- %s): %s"%(stack[0], stack[1], stack[2], msg))
 
+def yes_or_no(fmt, *args):
+    """Print message to user, and return True or False.
+
+    Arguments:
+    - `fmt`: format string.
+    - `*args`: arguments
+    """
+    try:
+        msg = fmt % args
+    except :
+        msg = fmt
+    print("%s\nAnswer with Yes[y] or No [n].\n"%(msg))
+
+    try:
+        return sys.stdin.readline().strip().lower() == 'y'
+    except KeyboardInterrupt as e:
+        print("\n\nAbort...\n")
+        sys.exit(1)
+
 # Utility functions..
 def GetFileContent(path, filterEmptyLine=True):
     """
@@ -237,7 +256,7 @@ class PortageObject(object):
     def __init__(self):
         """
         """
-        self.path   = {
+        self._path   = {
             'k': "/etc/portage/package.keywords/keywords",
             'm': "/etc/portage/package.mask/mask",
             'u': "/etc/portage/package.use/use",
@@ -247,12 +266,13 @@ class PortageObject(object):
             None: '/usr/portage/distfiles'
             }.get(opts.target, None)
 
-        if self.path and os.getenv("EPREFIX"):
+        self._portage_dir = '/usr/portage/'
+        if self._path and os.getenv("EPREFIX"):
             #Used by gentoo prefix(MacOsX).
-            self.path = os.path.join(os.getenv("EPREFIX"), self.path)
-
+            self._path = os.path.join(os.getenv("EPREFIX"), self._path)
+            self._portage_dir = os.path.join(os.getenv("EPREFIX"), self._portage_dir)
         try:
-            self.contents = GetFileContent(self.path)
+            self.contents = GetFileContent(self._path)
         except :
             self.contents=[]
         self.__parse__()
@@ -263,6 +283,48 @@ class PortageObject(object):
         parser.print_help()
 
     def Execute(self):
+        # check if target is valid.
+        if opts.args:
+            target = opts.args[0]
+            lt = target.lower()
+            #todo: get entries from overlay...
+            if not os.access(os.path.join(self._portage_dir, target), os.F_OK):
+                lst = []
+                for dir in os.listdir(self._portage_dir):
+                    fdir = os.path.join(self._portage_dir, dir)
+                    if dir == 'distfiles' or not os.path.isdir(fdir):
+                        continue
+                    for item in os.listdir(os.path.join(self._portage_dir, dir)):
+                        if lt in item.lower():
+                            lst.append(os.path.join(dir, item))
+                l = len(lst)
+                if l > 9:
+                    print("Too many entries containing %s, please help me to narrow down ...\n\t%s"%(
+                        target, '\n\t'.join(lst)))
+                    return
+                if l == 1:
+                    if yes_or_no("No entry for %s, do you mean: %s?", target, lst[0]):
+                        opts.args[0] = lst[0]
+                    else:
+                        print("Please enter a valid record and retry.\n")
+                        return
+                elif l != 0:
+                    print("Multiple possible record, please select one...\n")
+                    for i in range(l):
+                        print("%d: %s"%(i, lst[i]))
+
+                    print("\nSelect one from above list:\n")
+                    s = sys.stdin.readline().strip()
+                    try:
+                        idx = int(s)
+                    except:
+                        idx = -1
+
+                    if idx >= l or idx < 0:
+                        print("Wrong input, value should be 0 ~ %d"%(l-1))
+                        return
+                    opts.args[0] = lst[idx]
+
         func = {
             'add' : self.__add_obj__,
             'delete' : self.__del_obj__,
@@ -316,12 +378,12 @@ class PortageObject(object):
     def __dump__(self):
         """write contents back to disk file
         """
-        if self.path is None:
+        if self._path is None:
             print("Can't decide where to write files.!")
             sys.exit(1)
 
         tmpFile=None
-        dirn = os.path.dirname(self.path)
+        dirn = os.path.dirname(self._path)
         if os.path.exists(dirn) and not os.path.isdir(dirn):
             self.__merge_from_file(dirn)
             tmpFile = dirn+".bakup"
@@ -330,11 +392,11 @@ class PortageObject(object):
         if not os.access(dirn, os.F_OK):
             os.makedirs(dirn)
         try:
-            open(self.path, "w").write(self.__str__() + "\n")
+            open(self._path, "w").write(self.__str__() + "\n")
         except IOError as e:
             if tmpFile: # restore previous structure.
                 shutil.move(tmpFile, dirn)
-            print("failed to write to file: %s, reason: %s.\n"%(self.path, e.strerror))
+            print("failed to write to file: %s, reason: %s.\n"%(self._path, e.strerror))
             sys.exit(2)
         else:
             if tmpFile:
@@ -360,7 +422,7 @@ class PortageObject(object):
             sys.exit(1)
 
         item = " ".join(opts.args).strip() + "\n"
-        print("Adding %s to %s"%(item, self.path))
+        print("Adding %s to %s"%(item, self._path))
         self.contents.append(item)
         record = Record(item)
         self.records[record._name] = record
@@ -384,10 +446,8 @@ class PortageObject(object):
                     record._keep = False
                     operands.append(record._name)
         if len(operands) > 1:
-            print("Going to delete multiple records: \n\t%s,\ncontinue? [Y/N]"%(
-                "\n\t".join(map(lambda X: X.__str__(), operands))))
-
-            if sys.stdin.readline().strip().lower() != 'y':
+            if not yes_or_no("Going to delete multiple records: \n\t%s,\ncontinue? [Y/N]",
+                             "\n\t".join(map(lambda X: X.__str__(), operands))):
                 print("Operation aborted..\n")
                 sys.exit(1)
         else:
@@ -403,10 +463,10 @@ class PortageObject(object):
         #TODO: here we used contents instead of parsed records, may need to
         #      switch to records if necessary...
         if not self.contents:
-            print("No entries in %s\n"%self.path)
+            print("No entries in %s\n"%self._path)
             sys.exit(1)
 
-        print("Listing %s contains: %s"%(self.path, " ".join(opts.args)
+        print("Listing %s contains: %s"%(self._path, " ".join(opts.args)
                                          if opts.args else "all item"))
         if opts.args:
             result=set()
@@ -560,7 +620,7 @@ class KeywordsObject(PortageObject):
             args.append("**")
 
         item = " ".join(args).strip() + "\n"
-        print("Adding keyword %s to %s"%(item, self.path))
+        print("Adding keyword %s to %s"%(item, self._path))
         self.contents.append(item)
         record = Record(item)
         self.records[record._name] = record
@@ -624,11 +684,11 @@ class LinguasObject(UsesObject):
         Arguments:
         """
         if not self.contents:
-            print("No entries in %s\n"%self.path)
+            print("No entries in %s\n"%self._path)
             sys.exit(1)
 
         print("Listing %s for Linguas contains: %s\n"%(
-            self.path, " ".join(opts.args) if opts.args else "all item\n"))
+            self._path, " ".join(opts.args) if opts.args else "all item\n"))
         result=[]
         if opts.args:
             for entry in self.contents:
@@ -662,7 +722,7 @@ class DistPortageObject(PortageObject):
         """
         PortageObject.__init__(self)
         self._packages = {}
-        for root, dirs, files in os.walk(self.path):
+        for root, dirs, files in os.walk(self._path):
             for fn in files:
                 fpath = os.path.join(root, fn)
                 p = PackageRecord(fpath)
@@ -693,17 +753,10 @@ class DistPortageObject(PortageObject):
                 idx += 1
 
         if f_list:
-            print("\nGoing to deleted %d files,  %s disk spaces will be freed.\n"%(
-                len(f_list), stringify_size(f_size)))
-            print("Continue? (Y/N)\n")
-
-            try:
-                if sys.stdin.readline().strip().lower() != 'y':
-                    print("Operation aborted..\n")
-
-            except KeyboardInterrupt as e:
-                print("\n\nAbort...\n")
-                sys.exit(1)
+            if not yes_or_no("\nGoing to deleted %d files,  %s disk spaces will be freed.\n",
+                    len(f_list), stringify_size(f_size)):
+                print("Operation aborted..\n")
+                return
 
             try:
                 for item in f_list:
