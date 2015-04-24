@@ -1,5 +1,3 @@
-
-
 if(PYTHON)
   if(BUILD_CKMU)
     add_executable(ckmu main.c util.c)

@@ -1,1 +1,17 @@
+kmu is a utlity to manage keyword/use/mask for Gentoo.
 
+It provide two executables: python version and c version(deprecated).
+
+To enable both versions, call cmake with:
+
+  cmake -DPYTHON=ON -DBUILD_CMAKE=ON
+
+To enable python version only, call cmake with:
+
+ cmake -DPYTHON=ON -DBUILD_CMAKE=OFF
+
+To enable C version only, call cmake:
+
+ cmake -DPYTHON=OF -DBUILD_CMAKE=ON
+
+Then, make & make install
