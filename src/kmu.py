@@ -288,7 +288,8 @@ class PortageObject(object):
             target = opts.args[0]
             lt = target.lower()
             #todo: get entries from overlay...
-            if not os.access(os.path.join(self._portage_dir, target), os.F_OK):
+            if not os.access(os.path.join(self._portage_dir, target), os.F_OK) \
+               and opts.action != 'list':
                 lst = []
                 for dir in os.listdir(self._portage_dir):
                     fdir = os.path.join(self._portage_dir, dir)
