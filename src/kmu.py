@@ -41,6 +41,7 @@ m,  mask: 	mask a new keyword specified by package_string
 u,  use: 	Modify or add new use to package_string
 uL, Linguas: of USE.
 U,  Umask: 	Unmask a package
+e,  environment: environment of a package.
 
 ****** Examples: ******
 To list all keywords stored in /etc/portage/package.keyword:
@@ -52,7 +53,7 @@ To delete keyword entry which includes xxx
 To remove zh_CN linguas for man-pages
 	kmu -auL sys-apps/man-pages -zh_CN
 '''
-objs=['k', 'm', 'u', 'U', 'p', 'uL']
+objs=['k', 'm', 'u', 'U', 'p', 'uL', 'e']
 
 opts = None
 
@@ -263,6 +264,7 @@ class PortageObject(object):
             'uL': "/etc/portage/package.use/use",
             'U': "/etc/portage/package.unmask/unmask",
             'p': '/usr/portage/distfiles',
+            'e': "/etc/portage/package.env/env",
             None: '/usr/portage/distfiles'
             }.get(opts.target, None)
 
@@ -289,7 +291,7 @@ class PortageObject(object):
             lt = target.lower()
             #todo: get entries from overlay...
             if not os.access(os.path.join(self._portage_dir, target), os.F_OK) \
-               and opts.action != 'list':
+               and opts.action == 'add':
                 lst = []
                 for dir in os.listdir(self._portage_dir):
                     fdir = os.path.join(self._portage_dir, dir)
@@ -629,6 +631,20 @@ class KeywordsObject(PortageObject):
 
         print("Record saved..:\n\t%s \n"%record)
 
+class EnvironmentObject(PortageObject):
+    """
+    """
+    def __init__(self):
+        """
+        """
+        PDEBUG ("called.");
+        super(EnvironmentObject, self).__init__()
+    def __add_obj__(self):
+        """
+        """
+        # TODO: parse env files and make sure every entry is unique.
+        super(EnvironmentObject, self).__add_obj__()
+
 def stringify_size(s):
     P = 1024
     if s < P:
@@ -810,6 +826,7 @@ if __name__ == '__main__':
 
     executer = {
         'k' : KeywordsObject,
+        'e' : EnvironmentObject,
         'u' : UsesObject,
         'uL': LinguasObject,
         'p' : DistPortageObject,
