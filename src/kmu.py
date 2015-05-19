@@ -639,11 +639,25 @@ class EnvironmentObject(PortageObject):
         """
         PDEBUG ("called.");
         super(EnvironmentObject, self).__init__()
+        self._env_path = '/etc/portage/env'
+        if os.getenv('EPREFIX'):
+            self._env_path = os.path.join(os.getenv('EPREFIX'), self._env_path)
+
+        self.__parse_env()
+
     def __add_obj__(self):
-        """
-        """
-        # TODO: parse env files and make sure every entry is unique.
+    # TODO: parse env files and make sure every entry is unique.
+        for env in opts.args[1:]:
+            if not env in self._envs:
+                print("\nWarning: %s is not contained in portage.env...\n"%(env))
         super(EnvironmentObject, self).__add_obj__()
+
+    def __parse_env(self):
+        """
+        """
+        self._envs = set()
+        for item in glob.glob(os.path.join(self._env_path, '*')):
+            self._envs.add(os.path.basename(item))
 
 def stringify_size(s):
     P = 1024
