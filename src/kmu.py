@@ -83,7 +83,7 @@ def yes_or_no(fmt, *args):
         msg = fmt % args
     except :
         msg = fmt
-    print("%s\nAnswer with Yes[y] or No [n].\n"%(msg))
+    print("%s\nAnswer with Yes[y] or No [n]."%(msg))
 
     try:
         return sys.stdin.readline().strip().lower() == 'y'
