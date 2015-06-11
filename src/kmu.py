@@ -269,10 +269,19 @@ class PortageObject(object):
             }.get(opts.target, None)
 
         self._portage_dir = '/usr/portage/'
-        if self._path and os.getenv("EPREFIX"):
+        prefix = os.getenv("EPREFIX")
+        if prefix:
+            PDEBUG ("Got EPREFIX: %s", prefix);
             #Used by gentoo prefix(MacOsX).
-            self._path = os.path.join(os.getenv("EPREFIX"), self._path)
-            self._portage_dir = os.path.join(os.getenv("EPREFIX"), self._portage_dir)
+            self._path = os.path.join(prefix, self._path.strip(os.path.sep))
+            PDEBUG ("%s", os.path.join(prefix, self._portage_dir));
+            PDEBUG ("%s", os.path.join("a", "b"));
+            PDEBUG ("%s", os.path.join (prefix, "/bbbb"));
+
+            self._portage_dir = os.path.join(prefix, self._portage_dir.strip(os.path.sep))
+            PDEBUG ("%s -- %s", self._path, self._portage_dir);
+        else:
+            PDEBUG ("No EPREFIX detected..");
         try:
             self.contents = GetFileContent(self._path)
         except :
