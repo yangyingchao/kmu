@@ -274,6 +274,9 @@ class PortageObject(object):
             PDEBUG ("Got EPREFIX: %s", prefix);
             #Used by gentoo prefix(MacOsX).
             self._path = os.path.join(prefix, self._path.strip(os.path.sep))
+            if not os.access(self._path, os.F_OK):
+                self._path = os.path.dirname(self._path)
+
             PDEBUG ("%s", os.path.join(prefix, self._portage_dir));
             PDEBUG ("%s", os.path.join("a", "b"));
             PDEBUG ("%s", os.path.join (prefix, "/bbbb"));
