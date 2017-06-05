@@ -32,6 +32,7 @@ import shutil
 import argparse
 import re
 import traceback
+import subprocess
 
 desc = '''Simple tool to manager keyword/(un)mask/use for Gentoo'''
 elog = '''
@@ -345,6 +346,7 @@ class PortageObject(object):
             'delete' : self.__del_obj__,
             'list' : self.__list_obj__,
             'clean' : self.__clean_obj__,
+            'edit' : self.__edit_obj__,
             }.get(opts.action,
                   lambda x : parser.print_help())()
         pass
@@ -501,6 +503,21 @@ class PortageObject(object):
             else:
                 print("\n No entry found...\n")
         pass
+
+    def __edit_obj__(self):
+        """
+        Arguments:
+        """
+        if opts.args:
+            print("Parameters skipped: %s\n\n", opts.args)
+
+        editor = os.getenv("EDITOR")
+        if not os.access(editor, os.F_OK):
+            print("Environment variable EDITOR is not set.")
+            sys.exit(1)
+
+        PDEBUG("Calling: %s %s\n", editor, self._path)
+        os.execl(editor, "-n", self._path)
 
     def __clean_obj__(self):
         """
@@ -824,6 +841,9 @@ if __name__ == '__main__':
     parser.add_argument('-l', '--list', metavar='OBJ',
                         action=KmuArgAction,
                         choices=objs, help='list content of an OBJECT')
+    parser.add_argument('-e', '--edit', metavar='OBJ',
+                        action=KmuArgAction,
+                        choices=objs, help='edit file with "$EDITOR"')
     parser.add_argument('-c', '--clean',
                         action=KmuArgAction, nargs='?',
                         choices=objs, help='clean up content')
