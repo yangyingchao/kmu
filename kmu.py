@@ -259,7 +259,7 @@ class PortageObject(object):
         """
         """
         self._path   = {
-            'k': "/etc/portage/package.keywords/keywords",
+            'k': "/etc/portage/package.keywords/package.accept_keywords",
             'm': "/etc/portage/package.mask/mask",
             'u': "/etc/portage/package.use/use",
             'uL': "/etc/portage/package.use/use",
