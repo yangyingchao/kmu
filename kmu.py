@@ -150,6 +150,7 @@ class Record(object):
     def __str__(self):
         """
         """
+        PDEBUG("STR: %s" % self._content)
         return "%s" % (self._content if self._keep else "")
 
 
@@ -392,6 +393,7 @@ class PortageObject(object):
         if not os.access(dirn, os.F_OK):
             os.makedirs(dirn)
         try:
+            PDEBUG("Dumping...")
             open(self._path, "w").write(self.__str__() + "\n")
         except IOError as e:
             if tmpFile:  # restore previous structure.
@@ -421,8 +423,11 @@ class PortageObject(object):
             self.Help()
             sys.exit(1)
 
-        item = " ".join(opts.args).strip() + "\n"
+        item = " ".join(opts.args).strip()
         print("Adding %s to %s" % (item, self._path))
+
+        PDEBUG(item)
+
         self.contents.append(item)
         record = Record(item)
         self.records[record._name] = record
@@ -519,6 +524,7 @@ class PortageObject(object):
     def __str__(self):
         """
         """
+        PDEBUG('stringify')
         return "\n".join(map(lambda X: X.__str__(),
                              self.records.values()))
 
@@ -636,7 +642,7 @@ class KeywordsObject(PortageObject):
         if len(args) == 1:  # ok, I'll add "*" for you..
             args.append("**")
 
-        item = " ".join(args).strip() + "\n"
+        item = " ".join(args).strip()
         print("Adding keyword %s to %s" % (item, self._path))
         self.contents.append(item)
         record = Record(item)
