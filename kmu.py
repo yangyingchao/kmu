@@ -1,26 +1,26 @@
 #!/usr/bin/env python
 ######################################################################
-## Copyright (C) 2011, 2013, Yang, Ying-chao
+# Copyright (C) 2011, 2013, Yang, Ying-chao
 ##
-## Author:        Yang,Ying-chao <yangyingchao@gmail.com>
+# Author:        Yang,Ying-chao <yangyingchao@gmail.com>
 ##
-## This program is free software; you can redistribute it and/or
-## modify it under the terms of the GNU General Public License
-## as published by the Free Software Foundation; either version 2
-## of the License, or (at your option) any later version.
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License, or (at your option) any later version.
 ##
-## This program is distributed in the hope that it will be useful,
-## but WITHOUT ANY WARRANTY; without even the implied warranty of
-## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-## GNU General Public License for more details.
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
 ##
-## You should have received a copy of the GNU General Public License
-## along with this program; if not, write to the Free Software
-## Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 ##
-## Description:   simple utility to manager keyword, use and masks.
+# Description:   simple utility to manager keyword, use and masks.
 ##
-## TODO:
+# TODO:
 ##
 #####################################################################
 # -*- coding: utf-8 -*-
@@ -32,31 +32,31 @@ import shutil
 import argparse
 import re
 import traceback
-import subprocess
 
 desc = '''Simple tool to manager keyword/(un)mask/use for Gentoo'''
 elog = '''
 Where OBJECT could be one of the following:
 k,  keyword: Accept a new keyword specified by package_string
-m,  mask: 	mask a new keyword specified by package_string
-u,  use: 	Modify or add new use to package_string
+m,  mask:   mask a new keyword specified by package_string
+u,  use:    Modify or add new use to package_string
 uL, Linguas: of USE.
-U,  Umask: 	Unmask a package
+U,  Umask:  Unmask a package
 e,  environment: environment of a package.
 
 ****** Examples: ******
 To list all keywords stored in /etc/portage/package.keyword:
-	kmu -lk
+    kmu -lk
 To add a keyword into /etc/portage/package.keyword:
-	kmu -ak
+    kmu -ak
 To delete keyword entry which includes xxx
-	kmu -du xxx
+    kmu -du xxx
 To remove zh_CN linguas for man-pages
-	kmu -auL sys-apps/man-pages -zh_CN
+    kmu -auL sys-apps/man-pages -zh_CN
 '''
-objs=['k', 'm', 'u', 'U', 'p', 'uL', 'e']
+objs = ['k', 'm', 'u', 'U', 'p', 'uL', 'e']
 
 opts = None
+
 
 def PDEBUG(fmt, *args):
     """
@@ -67,11 +67,12 @@ def PDEBUG(fmt, *args):
 
     stack = traceback.extract_stack(None, 2)[0]
     try:
-        msg = fmt%args
+        msg = fmt % args
     except:
         msg = "Failed to format string.."
     finally:
-        print("DEBUG - (%s:%d -- %s): %s"%(stack[0], stack[1], stack[2], msg))
+        print("DEBUG - (%s:%d -- %s): %s" % (stack[0], stack[1], stack[2], msg))
+
 
 def yes_or_no(fmt, *args):
     """Print message to user, and return True or False.
@@ -82,17 +83,19 @@ def yes_or_no(fmt, *args):
     """
     try:
         msg = fmt % args
-    except :
+    except:
         msg = fmt
-    print("%s\nAnswer with Yes[y] or No [n]."%(msg))
+    print("%s\nAnswer with Yes[y] or No [n]." % (msg))
 
     try:
         return sys.stdin.readline().strip().lower() == 'y'
-    except KeyboardInterrupt as e:
+    except KeyboardInterrupt:
         print("\n\nAbort...\n")
         sys.exit(1)
 
 # Utility functions..
+
+
 def GetFileContent(path, filterEmptyLine=True):
     """
     Read file content.
@@ -106,17 +109,19 @@ def GetFileContent(path, filterEmptyLine=True):
         return []
 
     if filterEmptyLine:
-        return [x for x in contents if len(x.strip())!=0]
+        return [x for x in contents if len(x.strip()) != 0]
     else:
         return contents
+
 
 class KmuArgAction(argparse.Action):
     def __init__(self, option_strings, dest, **kwargs):
         super(KmuArgAction, self).__init__(option_strings, dest, **kwargs)
         pass
+
     def __call__(self, parser, namespace, values, option_string=None):
         if namespace.__dict__.get('action'):
-            print("Conflict actions: %s vs %s, showing usage...\n"%(
+            print("Conflict actions: %s vs %s, showing usage...\n" % (
                 self.dest, getattr(namespace, 'action')))
             parser.print_help()
             sys.exit(1)
@@ -126,6 +131,7 @@ class KmuArgAction(argparse.Action):
 
         setattr(namespace, 'action', self.dest)
         setattr(namespace, 'target', values)
+
 
 class Record(object):
     """Simple Record of entries.
@@ -138,15 +144,17 @@ class Record(object):
         - `content`:
         """
         self._content = content
-        self._name    = content
-        self._keep    = True
+        self._name = content
+        self._keep = True
 
     def __str__(self):
         """
         """
-        return "%s"%(self._content if self._keep else "")
+        return "%s" % (self._content if self._keep else "")
+
 
 r = re.compile('(.+?)(?:[-_]((?:\d+[\.\-_])+))')
+
 
 class PackageRecord(Record):
     """
@@ -172,15 +180,15 @@ class PackageRecord(Record):
             res = r.match(self._bname)
             if res:
                 self._key = res.group(1)
-                self._v   = res.group(2).replace('-', '.').replace('_', '.').strip('.')
+                self._v = res.group(2).replace('-', '.').replace('_', '.').strip('.')
             else:
                 self._key = "Unrecognized Files."
-                self._delete = True # flag to delete
+                self._delete = True  # flag to delete
 
     def __str__(self):
         """
         """
-        return self._fpath;
+        return self._fpath
 
     def __lt__(self, other):
         """
@@ -208,6 +216,7 @@ class PackageRecord(Record):
                 return l < o
         return False
 
+
 class PackageContainer(object):
     """
     """
@@ -217,7 +226,7 @@ class PackageContainer(object):
         """
         self._label = p._key
         if not p._delete:
-            self._current  = p
+            self._current = p
             self._del_list = []
         else:
             self._current = None
@@ -241,55 +250,51 @@ class PackageContainer(object):
         """
         """
         lst = []
-        sz  = 0
+        sz = 0
         for item in self._del_list:
             sz += item._size
             lst.append(item._fpath)
 
         if lst:
-            print(" %03d: %s"%(idx, self._label))
-            print("   KEEP: %s"%self._current)
-            print("   DEL : %s\n"%("\n         ".join(lst)))
+            print(" %03d: %s" % (idx, self._label))
+            print("   KEEP: %s" % self._current)
+            print("   DEL : %s\n" % ("\n         ".join(lst)))
         return (lst, sz)
+
 
 class PortageObject(object):
     """Generic object for portage files.
     """
+
     def __init__(self):
         """
         """
-        self._path   = {
+        self._path = {
             'k': "/etc/portage/package.keywords/package.accept_keywords",
             'm': "/etc/portage/package.mask/mask",
             'u': "/etc/portage/package.use/use",
-            'uL': "/etc/portage/package.use/use",
             'U': "/etc/portage/package.unmask/unmask",
             'p': '/usr/portage/distfiles',
             'e': "/etc/portage/package.env/env",
             None: '/usr/portage/distfiles'
-            }.get(opts.target, None)
+        }.get(opts.target, None)
 
         self._portage_dir = '/usr/portage/'
         prefix = os.getenv("EPREFIX")
         if prefix:
-            PDEBUG ("Got EPREFIX: %s", prefix);
-            #Used by gentoo prefix(MacOsX).
+            PDEBUG("Got EPREFIX: %s", prefix)
+            # Used by gentoo prefix(MacOsX).
             self._path = os.path.join(prefix, self._path.strip(os.path.sep))
             if not os.access(self._path, os.F_OK):
                 self._path = os.path.dirname(self._path)
-
-            PDEBUG ("%s", os.path.join(prefix, self._portage_dir));
-            PDEBUG ("%s", os.path.join("a", "b"));
-            PDEBUG ("%s", os.path.join (prefix, "/bbbb"));
-
+            PDEBUG("PORTDIR: %s", os.path.join(prefix, self._portage_dir))
             self._portage_dir = os.path.join(prefix, self._portage_dir.strip(os.path.sep))
-            PDEBUG ("%s -- %s", self._path, self._portage_dir);
         else:
-            PDEBUG ("No EPREFIX detected..");
+            PDEBUG("No EPREFIX detected..")
         try:
             self.contents = GetFileContent(self._path)
-        except :
-            self.contents=[]
+        except:
+            self.contents = []
         self.__parse__()
 
     def Help(self):
@@ -302,7 +307,7 @@ class PortageObject(object):
         if opts.args:
             target = opts.args[0]
             lt = target.lower()
-            #todo: get entries from overlay...
+            # todo: get entries from overlay...
             if not os.access(os.path.join(self._portage_dir, target), os.F_OK) \
                and opts.action == 'add':
                 lst = []
@@ -315,7 +320,7 @@ class PortageObject(object):
                             lst.append(os.path.join(dir, item))
                 l = len(lst)
                 if l > 9:
-                    print("Too many entries containing %s, please help me to narrow down ...\n\t%s"%(
+                    print("Too many entries containing %s, please help me to narrow down ...\n\t%s" % (
                         target, '\n\t'.join(lst)))
                     return
                 if l == 1:
@@ -327,7 +332,7 @@ class PortageObject(object):
                 elif l != 0:
                     print("Multiple possible record, please select one...\n")
                     for i in range(l):
-                        print("%d: %s"%(i, lst[i]))
+                        print("%d: %s" % (i, lst[i]))
 
                     print("\nSelect one from above list:\n")
                     s = sys.stdin.readline().strip()
@@ -337,18 +342,18 @@ class PortageObject(object):
                         idx = -1
 
                     if idx >= l or idx < 0:
-                        print("Wrong input, value should be 0 ~ %d"%(l-1))
+                        print("Wrong input, value should be 0 ~ %d" % (l - 1))
                         return
                     opts.args[0] = lst[idx]
 
-        func = {
-            'add' : self.__add_obj__,
-            'delete' : self.__del_obj__,
-            'list' : self.__list_obj__,
-            'clean' : self.__clean_obj__,
-            'edit' : self.__edit_obj__,
-            }.get(opts.action,
-                  lambda x : parser.print_help())()
+        {
+            'add': self.__add_obj__,
+            'delete': self.__del_obj__,
+            'list': self.__list_obj__,
+            'clean': self.__clean_obj__,
+            'edit': self.__edit_obj__,
+        }.get(opts.action,
+              lambda x: parser.print_help())()
         pass
 
     def __parse__(self):
@@ -358,7 +363,7 @@ class PortageObject(object):
         for content in self.contents:
             content = content.strip()
             if content.startswith('#'):
-                continue #skip comments.
+                continue  # skip comments.
             record = Record(content)
             self.records[record._name] = record
         pass
@@ -370,40 +375,18 @@ class PortageObject(object):
             path.join(os.getenv("EPREFIX"), path)
         return [path]
 
-    def __validate_item(item):
-        """Validate item, returns an item that can be recognized by portage.
-
-        Arguments:
-        - `item`: item to be validate.
-        """
-        first  = None
-        second = None
-        # if '/' in item:
-        #     cmps=item.split('/')
-        #     fist   = cmps[0]
-        #     second = cmps[1]
-        # else:
-        #     second = item
-
-        # portage_dirs = __get_portage_dir__()
-        # if first:
-        #     candidates = []
-        #     for path in portage_dirs:
-        #         candidates.extends(glob.glob(os.path.join(path, "*")))
-        return item
-
     def __dump__(self):
         """write contents back to disk file
         """
         if self._path is None:
-            print("Can't decide where to write files.!")
+            print("Can't decide where to write files!")
             sys.exit(1)
 
-        tmpFile=None
+        tmpFile = None
         dirn = os.path.dirname(self._path)
         if os.path.exists(dirn) and not os.path.isdir(dirn):
             self.__merge_from_file(dirn)
-            tmpFile = dirn+".bakup"
+            tmpFile = dirn + ".bakup"
             shutil.move(dirn, tmpFile)
 
         if not os.access(dirn, os.F_OK):
@@ -411,9 +394,9 @@ class PortageObject(object):
         try:
             open(self._path, "w").write(self.__str__() + "\n")
         except IOError as e:
-            if tmpFile: # restore previous structure.
+            if tmpFile:  # restore previous structure.
                 shutil.move(tmpFile, dirn)
-            print("failed to write to file: %s, reason: %s.\n"%(self._path, e.strerror))
+            print("failed to write to file: %s, reason: %s.\n" % (self._path, e.strerror))
             sys.exit(2)
         else:
             if tmpFile:
@@ -425,7 +408,7 @@ class PortageObject(object):
         for content in GetFileContent(path):
             content = content.strip()
             if content.startswith('#'):
-                continue #skip comments.
+                continue  # skip comments.
             record = Record(content)
             self.records[record._name] = record
 
@@ -439,7 +422,7 @@ class PortageObject(object):
             sys.exit(1)
 
         item = " ".join(opts.args).strip() + "\n"
-        print("Adding %s to %s"%(item, self._path))
+        print("Adding %s to %s" % (item, self._path))
         self.contents.append(item)
         record = Record(item)
         self.records[record._name] = record
@@ -468,7 +451,7 @@ class PortageObject(object):
                 print("Operation aborted..\n")
                 sys.exit(1)
         else:
-            print("Deleted item: %s\n"%(operands))
+            print("Deleted item: %s\n" % (operands))
 
         self.__dump__()
         pass
@@ -477,28 +460,28 @@ class PortageObject(object):
         """
         Arguments:
         """
-        #TODO: here we used contents instead of parsed records, may need to
+        # TODO: here we used contents instead of parsed records, may need to
         #      switch to records if necessary...
         if not self.contents:
-            print("No entries in %s\n"%self._path)
+            print("No entries in %s\n" % self._path)
             sys.exit(1)
 
-        print("Listing %s contains: %s"%(self._path, " ".join(opts.args)
-                                         if opts.args else "all item"))
+        print("Listing %s contains: %s" % (self._path, " ".join(opts.args)
+                                           if opts.args else "all item"))
         if opts.args:
-            result=set()
+            result = set()
             for entry in self.contents:
                 for item in opts.args:
                     if item in entry:
                         result.add(entry)
             if result:
-                print("\nTotal %d entries found, as follows\n\n%s"%(
+                print("\nTotal %d entries found, as follows\n\n%s" % (
                     len(result), "".join(result)))
             else:
                 print("\n No entry found.\n")
         else:
             if self.contents:
-                print("\nTotal %d entries found, as follows\n\n%s\n"%(
+                print("\nTotal %d entries found, as follows\n\n%s\n" % (
                     len(self.contents), "".join(self.contents)))
             else:
                 print("\n No entry found...\n")
@@ -537,34 +520,34 @@ class PortageObject(object):
         """
         """
         return "\n".join(map(lambda X: X.__str__(),
-                             self.records.values())).strip()+"\n"
+                             self.records.values()))
 
 
 class UseFlag:
     def __init__(self, record):
         if record.startswith('-'):
             self._use = record[1:]
-            self._sign   = '-'
+            self._sign = '-'
             return
 
         if record.startswith('+'):
             record = record[1:]
 
         self._use = record
-        self._sign   = ''
-
+        self._sign = ''
 
     def __str__(self):
-        return self._sign+self._use
+        return self._sign + self._use
 
     def __hash__(self):
         return hash(self._use)
+
 
 class UseRecord(Record):
     def __init__(self, entry):
         Record.__init__(self, entry)
         cmps = entry.split()
-        self._name = cmps.pop(0);
+        self._name = cmps.pop(0)
         self._flags = {}
         for e in cmps:
             flag = UseFlag(e)
@@ -580,11 +563,12 @@ class UseRecord(Record):
 
     def merge(self, args):
 
-        PDEBUG("Merging USE for %s: %s -- %s\n"%(
+        PDEBUG("Merging USE for %s: %s -- %s\n" % (
             self._name, self._flags.values(), args))
         for e in args:
             nflag = UseFlag(e)
             self._flags[nflag._use] = nflag
+
 
 class UsesObject(PortageObject):
     def __init__(self):
@@ -620,7 +604,7 @@ class UsesObject(PortageObject):
         self.records[record._name] = record
 
         self.__dump__()
-        print("Record saved..:\n\t%s \n"%record)
+        print("Record saved..:\n\t%s \n" % record)
 
     def __str__(self):
         result = ""
@@ -628,17 +612,18 @@ class UsesObject(PortageObject):
             result += str(record) + "\n"
         return result
 
+
 class KeywordsObject(PortageObject):
     def __init__(self):
         """
         """
-        PDEBUG ("called...");
+        PDEBUG("called...")
         PortageObject.__init__(self)
         pass
 
     def __add_obj__(self):
         args = opts.args
-        PDEBUG ("Adding %s", args);
+        PDEBUG("Adding %s", args)
         if not args or len(args) < 1:
             print("Adding operation needs arguments, showing usage\n\n")
             self.Help()
@@ -648,25 +633,27 @@ class KeywordsObject(PortageObject):
         if len(args) == 1:
             args = args[0].split()
 
-        if len(args) == 1: # ok, I'll add "*" for you..
+        if len(args) == 1:  # ok, I'll add "*" for you..
             args.append("**")
 
         item = " ".join(args).strip() + "\n"
-        print("Adding keyword %s to %s"%(item, self._path))
+        print("Adding keyword %s to %s" % (item, self._path))
         self.contents.append(item)
         record = Record(item)
         self.records[record._name] = record
         self.__dump__()
 
-        print("Record saved..:\n\t%s \n"%record)
+        print("Record saved..:\n\t%s \n" % record)
+
 
 class EnvironmentObject(PortageObject):
     """
     """
+
     def __init__(self):
         """
         """
-        PDEBUG ("called.");
+        PDEBUG("called.")
         super(EnvironmentObject, self).__init__()
         self._env_path = '/etc/portage/env'
         if os.getenv('EPREFIX'):
@@ -675,10 +662,10 @@ class EnvironmentObject(PortageObject):
         self.__parse_env()
 
     def __add_obj__(self):
-    # TODO: parse env files and make sure every entry is unique.
+        # TODO: parse env files and make sure every entry is unique.
         for env in opts.args[1:]:
-            if not env in self._envs:
-                print("\nWarning: %s is not contained in portage.env...\n"%(env))
+            if env not in self._envs:
+                print("\nWarning: %s is not contained in portage.env...\n" % (env))
         super(EnvironmentObject, self).__add_obj__()
 
     def __parse_env(self):
@@ -688,16 +675,17 @@ class EnvironmentObject(PortageObject):
         for item in glob.glob(os.path.join(self._env_path, '*')):
             self._envs.add(os.path.basename(item))
 
+
 def stringify_size(s):
     P = 1024
     if s < P:
-        return "%d bytes"%s
+        return "%d bytes" % s
     OP = P
     P *= 1024
     if s < P:
-        return "%d KB"%(s/OP)
+        return "%d KB" % (s / OP)
     else:
-        return "%.02f MB"%(float(s)/P)
+        return "%.02f MB" % (float(s) / P)
 
 
 class LinguasObject(UsesObject):
@@ -722,9 +710,9 @@ class LinguasObject(UsesObject):
         linguas = []
         for item in args[1:]:
             if item.startswith('-'):
-                linguas.append('-linguas_%s'%item[1:])
+                linguas.append('-linguas_%s' % item[1:])
             else:
-                linguas.append('linguas_%s'%item)
+                linguas.append('linguas_%s' % item)
 
         # Check if use entry exists in self.records, merge it if exists!
         record = self.records.pop(pkg, None)
@@ -732,24 +720,24 @@ class LinguasObject(UsesObject):
             record = UseRecord(pkg + " " + " ".join(linguas))
         else:
             record.merge(linguas)
-        PDEBUG ("Linguas: %s, Package: %s, Full: %s", linguas, pkg, record);
+        PDEBUG("Linguas: %s, Package: %s, Full: %s", linguas, pkg, record)
         self.records[record._name] = record
 
         self.__dump__()
 
-        print("Record saved..:\n\t%s \n"%record)
+        print("Record saved..:\n\t%s \n" % record)
 
     def __list_obj__(self):
         """
         Arguments:
         """
         if not self.contents:
-            print("No entries in %s\n"%self._path)
+            print("No entries in %s\n" % self._path)
             sys.exit(1)
 
-        print("Listing %s for Linguas contains: %s\n"%(
+        print("Listing %s for Linguas contains: %s\n" % (
             self._path, " ".join(opts.args) if opts.args else "all item\n"))
-        result=[]
+        result = []
         if opts.args:
             for entry in self.contents:
                 for item in opts.args:
@@ -758,18 +746,18 @@ class LinguasObject(UsesObject):
         else:
             result = self.contents
 
-        PDEBUG ("total entries: %d\n", len(result));
+        PDEBUG("total entries: %d\n", len(result))
 
         count = 0
         for item in result:
             if 'linguas' in item:
-                print("\t%s\n"%(item))
+                print("\t%s\n" % (item))
                 count += 1
 
-        if count == 0 :
+        if count == 0:
             print("No item found..\n")
         else:
-            print("Total %d items found..\n"%(count))
+            print("Total %d items found..\n" % (count))
         return
 
 
@@ -799,8 +787,8 @@ class DistPortageObject(PortageObject):
         Arguments:
         - `args`:
         """
-        f_size  = 0
-        f_list  = []
+        f_size = 0
+        f_list = []
         idx = 0
 
         print("Checking old packages....\n")
@@ -814,7 +802,7 @@ class DistPortageObject(PortageObject):
 
         if f_list:
             if not yes_or_no("\nGoing to deleted %d files,  %s disk spaces will be freed.\n",
-                    len(f_list), stringify_size(f_size)):
+                             len(f_list), stringify_size(f_size)):
                 print("Operation aborted..\n")
                 return
 
@@ -822,11 +810,12 @@ class DistPortageObject(PortageObject):
                 for item in f_list:
                     os.remove(item)
             except:
-                print("Failed to remove files: %s\n"%(sys.exc_info()[1]))
+                print("Failed to remove files: %s\n" % (sys.exc_info()[1]))
             else:
                 print("Finished in cleaning packages...\n")
         else:
             print("No old package detected...\n")
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=desc, epilog=elog,
@@ -871,13 +860,13 @@ if __name__ == '__main__':
         sys.exit(1)
 
     executer = {
-        'k' : KeywordsObject,
-        'e' : EnvironmentObject,
-        'u' : UsesObject,
+        'k': KeywordsObject,
+        'e': EnvironmentObject,
+        'u': UsesObject,
         'uL': LinguasObject,
-        'p' : DistPortageObject,
-        None : DistPortageObject
-        }.get(opts.target, PortageObject)()
+        'p': DistPortageObject,
+        None: DistPortageObject
+    }.get(opts.target, PortageObject)()
     executer.Execute()
 
 # Editor modelines
