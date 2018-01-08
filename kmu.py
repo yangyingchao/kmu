@@ -74,6 +74,17 @@ def PDEBUG(fmt, *args):
         print("DEBUG - (%s:%d -- %s): %s" % (stack[0], stack[1], stack[2], msg))
 
 
+def die(fmt, *args):
+    """
+
+    Arguments:
+    - `fmt`:
+    - `*args`:
+    """
+    print('%s' % (fmt % args))
+    sys.exit(1)
+
+
 def yes_or_no(fmt, *args):
     """Print message to user, and return True or False.
 
@@ -500,9 +511,11 @@ class PortageObject(object):
             print("Parameters skipped: %s\n\n", opts.args)
 
         editor = os.getenv("EDITOR")
+        if editor is None:
+            die("Can't find proper editor, please set environment variable: EDITOR.")
+
         if not os.access(editor, os.F_OK):
-            print("Environment variable EDITOR is not set.")
-            sys.exit(1)
+            die("Environment variable EDITOR is not set.")
 
         PDEBUG("Calling: %s %s\n", editor, self._path)
         os.execl(editor, "-n", self._path)
