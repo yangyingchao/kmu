@@ -286,23 +286,12 @@ class PortageObject(object):
             'm': "/etc/portage/package.mask/mask",
             'u': "/etc/portage/package.use/use",
             'U': "/etc/portage/package.unmask/unmask",
-            'p': '/usr/portage/distfiles',
+            'p': '/var/db/repos/gentoo/distfiles',
             'e': "/etc/portage/package.env/env",
-            None: '/usr/portage/distfiles'
+            None: '/var/db/repos/gentoo/distfiles'
         }.get(opts.target, None)
 
-        self._portage_dir = '/usr/portage/'
-        prefix = os.getenv("EPREFIX")
-        if prefix:
-            PDEBUG("Got EPREFIX: %s", prefix)
-            # Used by gentoo prefix(MacOsX).
-            self._path = os.path.join(prefix, self._path.strip(os.path.sep))
-            if not os.access(self._path, os.F_OK):
-                self._path = os.path.dirname(self._path)
-            PDEBUG("PORTDIR: %s", os.path.join(prefix, self._portage_dir))
-            self._portage_dir = os.path.join(prefix, self._portage_dir.strip(os.path.sep))
-        else:
-            PDEBUG("No EPREFIX detected..")
+        self._portage_dir = '/var/db/repos/gentoo/'
         try:
             self.contents = GetFileContent(self._path)
         except:
@@ -382,9 +371,7 @@ class PortageObject(object):
 
     def __get_portage_dir__(self):
         # todo: add overlays.
-        path = "/usr/portage"
-        if os.getenv("EPREFIX"):
-            path.join(os.getenv("EPREFIX"), path)
+        path = "/var/db/repos/gentoo"
         return [path]
 
     def __dump__(self):
@@ -675,9 +662,6 @@ class EnvironmentObject(PortageObject):
         PDEBUG("called.")
         super(EnvironmentObject, self).__init__()
         self._env_path = '/etc/portage/env'
-        if os.getenv('EPREFIX'):
-            self._env_path = os.path.join(os.getenv('EPREFIX'), self._env_path)
-
         self.__parse_env()
 
     def __add_obj__(self):
