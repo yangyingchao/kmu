@@ -32,6 +32,7 @@ import shutil
 import argparse
 import re
 import traceback
+import subprocess
 
 desc = '''Simple tool to manager keyword/(un)mask/use for Gentoo'''
 elog = '''
@@ -286,17 +287,17 @@ class PortageObject(object):
             'm': "/etc/portage/package.mask/mask",
             'u': "/etc/portage/package.use/use",
             'U': "/etc/portage/package.unmask/unmask",
-            'p': '/var/db/repos/gentoo/distfiles',
             'e': "/etc/portage/package.env/env",
             None: '/var/db/repos/gentoo/distfiles'
         }.get(opts.target, None)
 
         self._portage_dir = '/var/db/repos/gentoo/'
-        try:
-            self.contents = GetFileContent(self._path)
-        except:
-            self.contents = []
-        self.__parse__()
+        if self._path is not None:
+            try:
+                self.contents = GetFileContent(self._path)
+            except:
+                self.contents = []
+            self.__parse__()
 
     def Help(self):
         """
@@ -773,16 +774,30 @@ class DistPortageObject(PortageObject):
         """
         PortageObject.__init__(self)
         self._packages = {}
-        for root, dirs, files in os.walk(self._path):
-            for fn in files:
-                fpath = os.path.join(root, fn)
-                p = PackageRecord(fpath)
-                pc = self._packages.get(p._key)
-                if pc is None:
-                    pc = PackageContainer(p)
-                    self._packages[p._key] = pc
-                else:
-                    pc.AddPackage(p)
+
+        portage_info = subprocess.run(['emerge', '--info'],
+                                      stdout=subprocess.PIPE).stdout.decode('utf-8')
+
+        for line in portage_info.splitlines():
+            if line.startswith('DISTDIR'):
+                PDEBUG('L: %s'%(line))
+                self._path=line.split('=')[1].strip('"')
+
+        if self._path is None:
+            raise Exception('Failed to parse DISTDIR.')
+
+        for path in os.listdir(self._path):
+            fpath=os.path.join(self._path, path)
+            if os.path.isdir(fpath):
+                continue
+
+            p = PackageRecord(fpath)
+            pc = self._packages.get(p._key)
+            if pc is None:
+                pc = PackageContainer(p)
+                self._packages[p._key] = pc
+            else:
+                pc.AddPackage(p)
         pass
 
     def __clean_obj__(self):
